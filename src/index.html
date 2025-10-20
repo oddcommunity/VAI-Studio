@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalVoice AI - Speech-to-Text Testing</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <h1>LocalVoice AI</h1>
+      <p>Test and compare local speech-to-text models</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Left Panel: Controls -->
+      <aside class="controls-panel">
+        <section class="control-section">
+          <h2>Audio Input</h2>
+          <div class="file-upload">
+            <button id="select-file-btn" class="btn btn-primary">Select Audio File</button>
+            <button id="select-multiple-files-btn" class="btn btn-sm" style="margin-top: 0.5rem; width: 100%;">+ Add Multiple Files</button>
+            <div id="file-info" class="file-info hidden">
+              <p class="file-name"></p>
+              <p class="file-size"></p>
+            </div>
+            <div id="batch-queue" class="batch-queue hidden"></div>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h2>Backend</h2>
+          <select id="backend-select" class="select-input">
+            <option value="">Loading...</option>
+          </select>
+        </section>
+
+        <section class="control-section">
+          <h2>Model</h2>
+          <select id="model-select" class="select-input" disabled>
+            <option value="">Select a backend first</option>
+          </select>
+          <div id="model-info" class="model-info hidden">
+            <span class="model-size"></span>
+            <span class="model-wer"></span>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <h2>Comparison Mode</h2>
+          <label class="checkbox-label">
+            <input type="checkbox" id="comparison-mode">
+            <span>Compare multiple models</span>
+          </label>
+          <div id="comparison-options" class="hidden">
+            <select id="model-select-2" class="select-input">
+              <option value="">Select second model</option>
+            </select>
+            <select id="model-select-3" class="select-input">
+              <option value="">Select third model (optional)</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <button id="transcribe-btn" class="btn btn-success btn-large" disabled>
+            Transcribe
+          </button>
+          <button id="transcribe-batch-btn" class="btn btn-success btn-large hidden" style="margin-top: 0.5rem;">
+            Transcribe Batch
+          </button>
+          <div id="batch-progress" class="batch-progress hidden">
+            <p class="batch-progress-text">Processing: <span id="batch-current">0</span> / <span id="batch-total">0</span></p>
+            <div class="batch-progress-bar">
+              <div class="batch-progress-fill" id="batch-progress-fill"></div>
+            </div>
+          </div>
+        </section>
+      
+    <!-- Advanced Settings Section -->
+    <section class="control-section">
+      <h2>Advanced Settings</h2>
+      <button id="settings-btn" class="btn btn-sm btn-primary">⚙️ Settings</button>
+
+    </section>
+
+    <!-- Model Manager Section -->
+    <section class="control-section">
+      <h2>Model Manager</h2>
+      <button id="model-manager-btn" class="btn btn-sm btn-primary">📦 Manage Models</button>
+    </section>
+
+    <!-- Benchmark Section -->
+    <section class="control-section">
+      <h2>Benchmark</h2>
+      <button id="benchmark-btn" class="btn btn-sm btn-primary">📊 Run Benchmark</button>
+    </section>
+  </aside>
+
+
+      <!-- Right Panel: Results -->
+      <div class="results-panel">
+        <div id="welcome-screen" class="welcome-screen">
+          <h2>Welcome to LocalVoice AI</h2>
+          <p>Select an audio file and model to begin transcription</p>
+          <ul class="features-list">
+            <li>Test multiple STT models locally</li>
+            <li>Compare results side-by-side</li>
+            <li>View processing time and metrics</li>
+            <li>No cloud required - 100% local</li>
+          </ul>
+        </div>
+
+        <div id="results-container" class="results-container hidden">
+          <!-- Results will be dynamically added here -->
+        </div>
+
+        <div id="loading-screen" class="loading-screen hidden">
+          <div class="spinner"></div>
+          <p class="loading-text">Processing audio...</p>
+          <p class="loading-details"></p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+
+  <!-- Model Manager Modal -->
+  <div id="model-manager-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2>Model Manager</h2>
+        <button id="close-model-manager" class="modal-close">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="model-manager-tabs">
+          <button class="tab-btn active" data-tab="available">Available Models</button>
+          <button class="tab-btn" data-tab="installed">Installed Models</button>
+          <button class="tab-btn" data-tab="downloads">Downloads</button>
+        </div>
+        
+        <div id="available-tab" class="tab-content active">
+          <div id="available-models-list" class="models-list">
+            <!-- Populated by JavaScript -->
+          </div>
+        </div>
+        
+        <div id="installed-tab" class="tab-content hidden">
+          <div id="installed-models-list" class="models-list">
+            <!-- Populated by JavaScript -->
+          </div>
+        </div>
+        
+        <div id="downloads-tab" class="tab-content hidden">
+          <div id="downloads-list" class="download-manager">
+            <p class="no-downloads">No active downloads</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button id="refresh-models" class="btn btn-sm">🔄 Refresh</button>
+        <button id="close-model-manager-footer" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Advanced Settings</h2>
+        <button id="close-settings" class="modal-close">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="settings-section">
+          <h3>Performance</h3>
+          
+          <label class="settings-label">
+            Device Preference
+            <select id="device-preference" class="select-input">
+              <option value="auto">Auto (GPU if available)</option>
+              <option value="cpu">CPU Only</option>
+              <option value="cuda">CUDA (NVIDIA GPU)</option>
+            </select>
+          </label>
+          
+          <label class="settings-label">
+            Quantization
+            <select id="quantization" class="select-input">
+              <option value="auto">Auto</option>
+              <option value="fp32">FP32 (Full Precision)</option>
+              <option value="fp16">FP16 (Half Precision)</option>
+              <option value="int8">INT8 (Quantized)</option>
+            </select>
+          </label>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Transcription</h3>
+          
+          <label class="settings-label">
+            Default Language
+            <select id="default-language" class="select-input">
+              <option value="auto">Auto Detect</option>
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="zh">Chinese</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="enable-timestamps">
+            <span>Enable Timestamps</span>
+          </label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="enable-word-timestamps">
+            <span>Enable Word-level Timestamps</span>
+          </label>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Paths</h3>
+          
+          <label class="settings-label">
+            Model Cache Directory
+            <div class="path-input">
+              <input type="text" id="model-cache-path" class="select-input" placeholder="~/.cache/" readonly>
+              <button id="browse-cache-path" class="btn btn-sm">Browse</button>
+            </div>
+          </label>
+          
+          <label class="settings-label">
+            Default Export Directory
+            <div class="path-input">
+              <input type="text" id="export-path" class="select-input" placeholder="~/Documents/">
+              <button id="browse-export-path" class="btn btn-sm">Browse</button>
+            </div>
+          </label>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Interface</h3>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="auto-scroll">
+            <span>Auto-scroll to Results</span>
+          </label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="show-notifications">
+            <span>Show Desktop Notifications</span>
+          </label>
+          
+          <label class="settings-label">
+            Results Font Size
+            <select id="font-size" class="select-input">
+              <option value="small">Small</option>
+              <option value="medium" selected>Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button id="reset-settings" class="btn btn-sm">Reset to Defaults</button>
+        <button id="save-settings" class="btn btn-success">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Benchmark Modal -->
+  <div id="benchmark-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2>Benchmark Suite</h2>
+        <button id="close-benchmark" class="modal-close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="benchmark-intro">
+          <p>Test model accuracy and performance with built-in test samples.</p>
+        </div>
+
+        <div class="benchmark-settings" style="margin-top: 1.5rem;">
+          <h3>Select Model to Benchmark</h3>
+          <select id="benchmark-backend-select" class="select-input">
+            <option value="">Select backend...</option>
+          </select>
+          <select id="benchmark-model-select" class="select-input" disabled>
+            <option value="">Select model...</option>
+          </select>
+        </div>
+
+        <div class="benchmark-samples" style="margin-top: 1.5rem;">
+          <h3>Test Samples</h3>
+          <div id="benchmark-samples-list"></div>
+        </div>
+
+        <div id="benchmark-results" class="benchmark-results hidden" style="margin-top: 1.5rem;">
+          <h3>Benchmark Results</h3>
+          <div id="benchmark-results-content"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="run-benchmark" class="btn btn-success" disabled>Run Benchmark</button>
+        <button id="close-benchmark-footer" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+  <script src="benchmark.js"></script>
+</body>
+</html>

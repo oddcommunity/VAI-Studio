@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#2563eb" rx="128"/>
+  
+  <!-- Microphone icon -->
+  <g transform="translate(256, 256)">
+    <!-- Mic body -->
+    <rect x="-40" y="-120" width="80" height="140" fill="white" rx="40"/>
+    <!-- Mic stand -->
+    <rect x="-5" y="30" width="10" height="80" fill="white"/>
+    <!-- Mic base -->
+    <rect x="-60" y="100" width="120" height="15" fill="white" rx="7"/>
+    <!-- Sound waves -->
+    <path d="M -120 -40 Q -140 -40 -140 -60" stroke="white" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <path d="M 120 -40 Q 140 -40 140 -60" stroke="white" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <path d="M -100 20 Q -110 20 -110 0" stroke="white" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <path d="M 100 20 Q 110 20 110 0" stroke="white" stroke-width="10" fill="none" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="256" y="460" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">LocalVoice</text>
+</svg>

@@ -1,0 +1,15 @@
+{
+  "samples": [
+    {
+      "id": "test_voice",
+      "name": "Test Voice File",
+      "audio_path": "/root/localvoiceAI/Test voice file.m4a",
+      "reference_text": "This is a test recording for the speech to text application.",
+      "duration": "~5s",
+      "difficulty": "Easy",
+      "description": "Real audio test sample for benchmark verification"
+    }
+  ],
+  "version": "1.0.0",
+  "description": "Benchmark test samples for LocalVoice AI"
+}
