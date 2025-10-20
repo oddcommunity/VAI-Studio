@@ -13,12 +13,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from whisper_backend import WhisperBackend
 from voxtral_backend import VoxtralBackend
+from parakeet_backend import ParakeetBackend
+from granite_backend import GraniteBackend
+from wav2vec_bert_backend import Wav2VecBERTBackend
+from canary_backend import CanaryBackend
 
 
 # Registry of available backends
 BACKENDS = {
     'whisper': WhisperBackend,
     'voxtral': VoxtralBackend,
+    'parakeet': ParakeetBackend,
+    'granite': GraniteBackend,
+    'wav2vec_bert': Wav2VecBERTBackend,
+    'canary': CanaryBackend,
 }
 
 

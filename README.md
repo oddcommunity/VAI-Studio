@@ -17,13 +17,15 @@ LocalVoice AI is a desktop application for testing and comparing speech-to-text 
 
 ### Key Features
 
-- **Multi-Backend Support** - Test Whisper (13 models) and Voxtral (2 models)
+- **6 Backend Families** - Whisper, Voxtral, Parakeet, Granite, Wav2Vec-BERT, Canary
+- **23 Total Models** - From ultra-fast (Parakeet) to highest accuracy (Canary)
 - **Side-by-Side Comparison** - Compare up to 3 models simultaneously
 - **Multiple Export Formats** - TXT, JSON, SRT (subtitles), VTT
 - **Batch Processing** - Transcribe multiple files with queue management
 - **Benchmarking Suite** - Test model accuracy with real WER calculation
 - **Model Manager** - Download and manage models with progress tracking
 - **Auto-Update System** - Automatic updates via electron-updater
+- **Advanced Features** - Speaker diarization (Canary), multilingual (Granite), LLM refinement
 - **Advanced Settings** - GPU acceleration, quantization, language selection, persistence
 - **Beautiful UI** - Dark theme with 30+ smooth animations
 - **100% Local** - No internet required for transcription (only for initial model downloads)
@@ -144,6 +146,29 @@ Test model accuracy with real WER calculation and reference vs hypothesis compar
 - `Voxtral-Mini-3B-2507` - ~6GB, 3B params, 6.68% WER, transcription + summarization + Q&A
 - `Voxtral-Small-24B-2507` - ~48GB, 24B params, 6.31% WER, highest accuracy, advanced features
 
+### Parakeet (NVIDIA) - 2 Models ✅ NEW!
+**Ultra-fast ASR with FastConformer-XL architecture:**
+- `parakeet-tdt-0.6b-v2` - ~1.2GB, 600M params, 6.05% WER, ultra-fast (RTF 3386) ⭐ Recommended for speed
+- `parakeet-tdt-1.1b` - ~2.2GB, 1.1B params, ~5.5% WER, larger variant with better accuracy
+
+### Granite (IBM) - 1 Model ✅ NEW!
+**Multilingual ASR with LLM-based refinement:**
+- `granite-speech-3.3` - ~6-7GB, 3.3B params, 5.85% WER, two-pass architecture (ASR + LLM refinement)
+- **Languages**: English, Spanish, French, German, Portuguese
+
+### Wav2Vec-BERT (Facebook/Meta) - 3 Models ✅ NEW!
+**Optimized for low-resource languages and code-switching:**
+- `w2v-bert-2.0` - ~600MB, 600M params, 6-8% WER, multilingual pre-training on 4.5M hours
+- `wav2vec2-base` - ~360MB, 95M params, ~8-10% WER, base model
+- `wav2vec2-large-xlsr-53` - ~1.2GB, 300M params, ~6-8% WER, 53 languages
+
+### Canary (NVIDIA) - 2 Models ✅ NEW!
+**Highest accuracy with speaker diarization (SALM architecture):**
+- `canary-qwen-2.5b` - ~5GB, 2.5B params, 5.63% WER, best accuracy ⭐ Recommended for accuracy
+- `canary-1b` - ~2GB, 1B params, ~6% WER, lighter variant
+- **Features**: Speaker diarization, punctuation, code-switching support
+- **Note**: Full features require NeMo toolkit: `pip install nemo_toolkit[asr]`
+
 ---
 
 ## System Requirements
@@ -169,11 +194,16 @@ Test model accuracy with real WER calculation and reference vs hypothesis compar
 - **Desktop Framework**: Electron 38.3.0
 - **Backend Processing**: Python 3.8+
 - **Audio Processing**: ffmpeg
-- **STT Models**:
-  - OpenAI Whisper
-  - Faster Whisper (optimized)
-  - Transformers (HuggingFace)
+- **STT Models** (6 backends, 23 models):
+  - OpenAI Whisper / Faster Whisper
   - Mistral Voxtral
+  - NVIDIA Parakeet (FastConformer-XL)
+  - IBM Granite Speech (ASR + LLM)
+  - Facebook Wav2Vec-BERT
+  - NVIDIA Canary (SALM with diarization)
+- **ML Frameworks**:
+  - HuggingFace Transformers
+  - NVIDIA NeMo Toolkit (optional, for Canary diarization)
 - **Auto-Updates**: electron-updater
 
 ---
@@ -350,11 +380,12 @@ Inspired by:
 
 ## Version History
 
-- **v3.0.0** (Oct 2025) - Production Ready: Model Manager, Benchmarking, Auto-Update, Batch Processing, Export, Polish ⭐
+- **v4.0.0** (Oct 2025) - Major Expansion: +4 New Backends (Parakeet, Granite, Wav2Vec-BERT, Canary), 23 Total Models, Speaker Diarization, Multilingual Support ⭐ LATEST
+- **v3.0.0** (Oct 2025) - Production Ready: Model Manager, Benchmarking, Auto-Update, Batch Processing, Export, Polish
 - **v2.0.0** - Multi-backend, Comparison Mode, Electron App
 - **v1.0.0** - Basic Whisper Integration
 
-**Total**: ~6,500+ lines of code, 7 documentation guides, 100% feature complete
+**Total**: ~8,000+ lines of code, 6 backends, 23 models, 100% feature complete
 
 ---
 
