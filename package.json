@@ -46,7 +46,11 @@
       {
         "from": "backends",
         "to": "backends",
-        "filter": ["**/*.py", "!__pycache__", "!*.pyc"]
+        "filter": [
+          "**/*.py",
+          "!__pycache__",
+          "!*.pyc"
+        ]
       },
       {
         "from": "test_audio.wav",
@@ -55,16 +59,26 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.icns",
       "darkModeSupport": true
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
     },
     "linux": {
-      "target": ["AppImage", "deb", "rpm"],
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
       "category": "Development",
       "icon": "assets/icon.png"
     },

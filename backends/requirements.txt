@@ -1,0 +1,31 @@
+# Core dependencies for LocalVoice AI backends
+
+# Whisper backend
+openai-whisper>=20231117
+faster-whisper>=0.10.0
+
+# Voxtral backend (Transformers-based)
+transformers>=4.36.0
+torch>=2.1.0
+torchaudio>=2.1.0
+
+# Parakeet backend (NVIDIA NeMo)
+nemo_toolkit[asr]>=1.22.0
+
+# Canary backend
+# Uses transformers (already included)
+
+# Granite backend
+# Uses transformers (already included)
+
+# Wav2Vec BERT backend
+# Uses transformers (already included)
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+ffmpeg-python>=0.2.0
+
+# Utilities
+numpy>=1.24.0
+scipy>=1.11.0

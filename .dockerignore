@@ -1,0 +1,51 @@
+# Node modules (will be installed in container)
+node_modules/
+npm-debug.log*
+
+# Python cache
+backends/__pycache__/
+backends/*.pyc
+backends/.pytest_cache/
+backends/venv/
+venv/
+*.egg-info/
+
+# Build outputs
+dist/
+build/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in container)
+*.md
+!README.md
+
+# Large model files (should be downloaded separately)
+*.gguf
+*.bin
+models/
+
+# Environment files
+.env
+.env.local
+
+# Logs
+logs/
+*.log

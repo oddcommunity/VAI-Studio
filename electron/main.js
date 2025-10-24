@@ -1,14 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
-
-// Configure auto-updater
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+let autoUpdater;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -34,6 +30,76 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Initialize auto-updater after app is ready
+  const { autoUpdater: updater } = require('electron-updater');
+  autoUpdater = updater;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  console.log('[Auto-Update] System initialized');
+
+  // Set up auto-updater event handlers
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[Auto-Update] Checking for update...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[Auto-Update] Update available:', info.version);
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Available',
+        message: `A new version (${info.version}) is available!`,
+        detail: 'Would you like to download it now?',
+        buttons: ['Download', 'Later'],
+        defaultId: 0,
+        cancelId: 1
+      }).then(result => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+          if (mainWindow) {
+            mainWindow.webContents.send('update-downloading');
+          }
+        }
+      });
+    }
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('[Auto-Update] No updates available');
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[Auto-Update] Error:', err);
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    let log = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`;
+    log += ` (${progressObj.transferred}/${progressObj.total})`;
+    console.log('[Auto-Update]', log);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-progress', progressObj);
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[Auto-Update] Update downloaded');
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Ready',
+        message: 'Update downloaded successfully!',
+        detail: 'The application will restart to install the update.',
+        buttons: ['Restart Now', 'Restart Later'],
+        defaultId: 0,
+        cancelId: 1
+      }).then(result => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall(false, true);
+        }
+      });
+    }
+  });
+
   createWindow();
 
   // Check for updates after 3 seconds (give app time to settle)
@@ -55,7 +121,10 @@ app.on('window-all-closed', function () {
 // Helper to run Python backend commands
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
-    const pythonPath = 'python3';
+    // Use venv Python if in Docker, otherwise system Python
+    const pythonPath = process.env.DOCKER_ENV === 'true'
+      ? '/app/venv/bin/python'
+      : 'python3';
     const scriptPath = path.join(__dirname, '../backends/runner.py');
     const os = require('os');
 
@@ -66,26 +135,36 @@ function runPythonCommand(args) {
 
     console.log('[Python] Running:', pythonPath, scriptPath, ...args);
 
-    const process = spawn(pythonPath, [scriptPath, ...args], {
+    const pythonProcess = spawn(pythonPath, [scriptPath, ...args], {
       env: { ...process.env, PATH: envPath }
     });
-    
+
     let stdout = '';
     let stderr = '';
-    
-    process.stdout.on('data', (data) => {
+
+    pythonProcess.stdout.on('data', (data) => {
       stdout += data.toString();
     });
-    
-    process.stderr.on('data', (data) => {
+
+    pythonProcess.stderr.on('data', (data) => {
       stderr += data.toString();
       console.log('[Python stderr]:', data.toString());
     });
-    
-    process.on('close', (code) => {
+
+    pythonProcess.on('close', (code) => {
       if (code === 0) {
         try {
-          const result = JSON.parse(stdout);
+          // Extract JSON from stdout (may contain extra text before/after)
+          // Try to find JSON object in the output
+          let jsonStr = stdout.trim();
+
+          // If output contains non-JSON text, try to extract the JSON part
+          const jsonMatch = jsonStr.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+          if (jsonMatch) {
+            jsonStr = jsonMatch[0];
+          }
+
+          const result = JSON.parse(jsonStr);
           resolve(result);
         } catch (e) {
           reject(new Error(`Failed to parse JSON: ${e.message}\nOutput: ${stdout}`));
@@ -94,8 +173,8 @@ function runPythonCommand(args) {
         reject(new Error(`Python process exited with code ${code}\nStderr: ${stderr}`));
       }
     });
-    
-    process.on('error', (err) => {
+
+    pythonProcess.on('error', (err) => {
       reject(new Error(`Failed to start Python process: ${err.message}`));
     });
   });
@@ -332,69 +411,6 @@ function checkForUpdates() {
     console.error('[Auto-Update] Error checking for updates:', err);
   });
 }
-
-// Auto-updater event handlers
-autoUpdater.on('checking-for-update', () => {
-  console.log('[Auto-Update] Checking for update...');
-});
-
-autoUpdater.on('update-available', (info) => {
-  console.log('[Auto-Update] Update available:', info.version);
-  if (mainWindow) {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) is available!`,
-      detail: 'Would you like to download it now?',
-      buttons: ['Download', 'Later'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(result => {
-      if (result.response === 0) {
-        autoUpdater.downloadUpdate();
-        if (mainWindow) {
-          mainWindow.webContents.send('update-downloading');
-        }
-      }
-    });
-  }
-});
-
-autoUpdater.on('update-not-available', () => {
-  console.log('[Auto-Update] No updates available');
-});
-
-autoUpdater.on('error', (err) => {
-  console.error('[Auto-Update] Error:', err);
-});
-
-autoUpdater.on('download-progress', (progressObj) => {
-  let log = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`;
-  log += ` (${progressObj.transferred}/${progressObj.total})`;
-  console.log('[Auto-Update]', log);
-  if (mainWindow) {
-    mainWindow.webContents.send('update-progress', progressObj);
-  }
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('[Auto-Update] Update downloaded');
-  if (mainWindow) {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Ready',
-      message: 'Update downloaded successfully!',
-      detail: 'The application will restart to install the update.',
-      buttons: ['Restart Now', 'Restart Later'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(result => {
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall(false, true);
-      }
-    });
-  }
-});
 
 // IPC handler for manual update check
 ipcMain.handle('check-for-updates', async () => {

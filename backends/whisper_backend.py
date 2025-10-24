@@ -5,6 +5,7 @@ Uses OpenAI's Whisper model via the openai-whisper package.
 
 import time
 import os
+import sys
 from typing import Dict, List
 from base import STTBackend, ModelInfo
 
@@ -45,7 +46,7 @@ class WhisperBackend(STTBackend):
         """Load or return cached model."""
         if self._current_model_name != model_name:
             whisper = self._load_whisper()
-            print(f"Loading Whisper model: {model_name}...")
+            print(f"[INFO] Loading Whisper model: {model_name}...", file=sys.stderr)
             self._current_model = whisper.load_model(model_name)
             self._current_model_name = model_name
         return self._current_model
@@ -69,7 +70,7 @@ class WhisperBackend(STTBackend):
             model = self._get_model(model_name)
 
             # Transcribe
-            print(f"Transcribing with Whisper {model_name}...")
+            print(f"[INFO] Transcribing with Whisper {model_name}...", file=sys.stderr)
             result = model.transcribe(audio_path, **kwargs)
 
             processing_time = time.time() - start_time
@@ -138,15 +139,15 @@ class WhisperBackend(STTBackend):
         Download a Whisper model.
         Actually, Whisper downloads automatically on first use, so we just trigger a load.
         """
-        print(f"Downloading Whisper model: {model_name}")
-        print("(Whisper will download automatically on first transcription)")
+        print(f"[INFO] Downloading Whisper model: {model_name}", file=sys.stderr)
+        print("[INFO] (Whisper will download automatically on first transcription)", file=sys.stderr)
 
         # Pre-load the model to trigger download
         try:
             model = self._get_model(model_name)
-            print(f"Model {model_name} is ready!")
+            print(f"[INFO] Model {model_name} is ready!", file=sys.stderr)
         except Exception as e:
-            print(f"Error downloading model: {e}")
+            print(f"[ERROR] Error downloading model: {e}", file=sys.stderr)
             raise
 
     def benchmark(self, audio_path: str, model_name: str, reference_text: str) -> Dict:

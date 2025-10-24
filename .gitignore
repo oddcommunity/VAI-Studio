@@ -40,6 +40,8 @@ models/
 # Environment
 .env
 .env.local
+venv/
+venv_local/
 
 # Temporary files
 tmp/

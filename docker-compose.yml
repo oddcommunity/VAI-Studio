@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  localvoice-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: localvoice-ai-dev
+    volumes:
+      # Mount source code for live development
+      - ./src:/app/src
+      - ./electron:/app/electron
+      - ./backends:/app/backends
+      # Persist node_modules
+      - node_modules:/app/node_modules
+      # Mount test audio files
+      - ./test-samples:/app/test-samples
+      - ./test_audio.wav:/app/test_audio.wav
+    environment:
+      - DISPLAY=${DISPLAY:-:99}
+      - NODE_ENV=development
+      - ELECTRON_DISABLE_SANDBOX=1
+      - DOCKER_ENV=true
+    # For X11 forwarding (macOS with XQuartz)
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: /bin/bash -c "Xvfb :99 -screen 0 1024x768x16 & npm run dev"
+
+  # Headless testing service (for CI/CD or testing without GUI)
+  localvoice-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: localvoice-ai-test
+    volumes:
+      - ./backends:/app/backends
+      - ./test-samples:/app/test-samples
+    environment:
+      - NODE_ENV=test
+    command: /bin/bash -c ". /app/venv/bin/activate && python3 backends/runner.py list-backends"
+
+volumes:
+  node_modules:
