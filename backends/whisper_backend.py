@@ -34,13 +34,51 @@ class WhisperBackend(STTBackend):
         self._whisper = None
         self._current_model = None
         self._current_model_name = None
+        self._url_patched = False
 
     def _load_whisper(self):
         """Lazy load whisper module."""
         if self._whisper is None:
             import whisper
             self._whisper = whisper
+            self._patch_whisper_urls_if_needed()
         return self._whisper
+
+    def _patch_whisper_urls_if_needed(self):
+        """
+        Replace CDN URLs with direct blob storage URLs if CDN is unreachable.
+        This fixes DNS issues when accessing openaipublic.azureedge.net.
+        Fallback: openaipublic.blob.core.windows.net (slower but more reliable)
+        """
+        if self._url_patched:
+            return
+
+        self._url_patched = True
+
+        # Test if CDN is reachable
+        cdn_reachable = True
+        try:
+            import urllib.request
+            urllib.request.urlopen('https://openaipublic.azureedge.net/', timeout=5)
+        except Exception as e:
+            print(f"[INFO] Azure CDN unreachable ({e}), using fallback blob storage URLs", file=sys.stderr)
+            cdn_reachable = False
+
+        # If CDN works, no need to patch
+        if cdn_reachable:
+            print("[INFO] Using primary Azure CDN for Whisper downloads", file=sys.stderr)
+            return
+
+        # Patch all model URLs to use blob storage instead of CDN
+        if hasattr(self._whisper, '_MODELS'):
+            for model_name in list(self._whisper._MODELS.keys()):
+                original_url = self._whisper._MODELS[model_name]
+                fallback_url = original_url.replace(
+                    'openaipublic.azureedge.net',
+                    'openaipublic.blob.core.windows.net'
+                )
+                self._whisper._MODELS[model_name] = fallback_url
+            print("[INFO] Whisper URLs patched to use blob storage fallback", file=sys.stderr)
 
     def _get_model(self, model_name: str):
         """Load or return cached model."""

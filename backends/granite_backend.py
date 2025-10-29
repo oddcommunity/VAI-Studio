@@ -14,10 +14,10 @@ class GraniteBackend(STTBackend):
     """IBM Granite speech recognition backend - multilingual with LLM refinement."""
 
     MODELS = {
-        'granite-speech-3.3': ModelInfo(
-            'granite-speech-3.3',
+        'granite-speech-3.3-8b': ModelInfo(
+            'granite-speech-3.3-8b',
             '~6-7GB',
-            '3.3B',
+            '8B',
             '5.85%',
             ['transcription', 'multilingual', 'llm-refinement', 'en', 'es', 'fr', 'de', 'pt']
         ),
