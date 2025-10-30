@@ -121,10 +121,10 @@ app.on('window-all-closed', function () {
 // Helper to run Python backend commands
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
-    // Use venv Python if in Docker, otherwise system Python
+    // Use venv Python if in Docker, otherwise local venv Python
     const pythonPath = process.env.DOCKER_ENV === 'true'
       ? '/app/venv/bin/python'
-      : 'python3';
+      : path.join(__dirname, '../backends/venv/bin/python3');
     const scriptPath = path.join(__dirname, '../backends/runner.py');
     const os = require('os');
 

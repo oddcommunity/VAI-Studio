@@ -42,6 +42,14 @@ models/
 .env.local
 venv/
 venv_local/
+backends/venv/bin/python3
+backends/venv/bin/python3.*
+backends/venv/lib64
+backends/venv/pyvenv.cfg
+
+# Local config changes (don't commit local modifications)
+docker-compose.yml
+FILE_ACCESS_DOCKER.md
 
 # Temporary files
 tmp/
