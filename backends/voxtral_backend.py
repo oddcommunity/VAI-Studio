@@ -18,14 +18,16 @@ class VoxtralBackend(STTBackend):
             '~6GB',
             '3B',
             '6.68%',
-            ['transcription', 'summarization', 'Q&A']
+            ['transcription', 'summarization', 'Q&A'],
+            'Mistral AI'
         ),
         'Voxtral-Small-24B-2507': ModelInfo(
             'Voxtral-Small-24B-2507',
             '~48GB',
             '24B',
             '6.31%',
-            ['transcription', 'summarization', 'Q&A']
+            ['transcription', 'summarization', 'Q&A'],
+            'Mistral AI'
         ),
     }
 
@@ -101,19 +103,39 @@ class VoxtralBackend(STTBackend):
                 else:  # transcribe
                     prompt = "Transcribe this audio."
 
-            conversation = [{
-                "role": "user",
-                "content": [
-                    {"type": "audio", "path": audio_path},
-                    {"type": "text", "text": prompt}
-                ]
-            }]
+            # Load and convert audio to WAV if needed (M4A not supported by processor)
+            import librosa
+            import soundfile as sf
+            import tempfile
 
-            print(f"Processing with Voxtral {model_name}...")
-            print(f"Task: {task}")
+            print(f"Loading audio file: {audio_path}")
+            # Load audio with librosa (supports M4A via audioread/ffmpeg)
+            audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
 
-            # Process
-            inputs = processor.apply_chat_template(conversation)
+            # Save to temporary WAV file for processor
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                temp_wav_path = tmp_file.name
+                sf.write(temp_wav_path, audio_data, sample_rate)
+
+            try:
+                conversation = [{
+                    "role": "user",
+                    "content": [
+                        {"type": "audio", "path": temp_wav_path},
+                        {"type": "text", "text": prompt}
+                    ]
+                }]
+
+                print(f"Processing with Voxtral {model_name}...")
+                print(f"Task: {task}")
+
+                # Process
+                inputs = processor.apply_chat_template(conversation)
+            finally:
+                # Clean up temporary file
+                import os
+                if os.path.exists(temp_wav_path):
+                    os.unlink(temp_wav_path)
             device = "cuda" if torch.cuda.is_available() else "cpu"
             dtype = torch.bfloat16 if device == "cuda" else torch.float32
             inputs = inputs.to(device, dtype=dtype)

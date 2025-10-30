@@ -14,19 +14,19 @@ class WhisperBackend(STTBackend):
     """OpenAI Whisper speech recognition backend."""
 
     MODELS = {
-        'tiny': ModelInfo('tiny', '39MB', '39M', '~15%', ['transcription', 'translation']),
-        'tiny.en': ModelInfo('tiny.en', '39MB', '39M', '~15%', ['transcription']),
-        'base': ModelInfo('base', '74MB', '74M', '~10%', ['transcription', 'translation']),
-        'base.en': ModelInfo('base.en', '74MB', '74M', '~10%', ['transcription']),
-        'small': ModelInfo('small', '244MB', '244M', '~8%', ['transcription', 'translation']),
-        'small.en': ModelInfo('small.en', '244MB', '244M', '~8%', ['transcription']),
-        'medium': ModelInfo('medium', '769MB', '769M', '~6%', ['transcription', 'translation']),
-        'medium.en': ModelInfo('medium.en', '769MB', '769M', '~6%', ['transcription']),
-        'large': ModelInfo('large', '1.5GB', '1.5B', '~5%', ['transcription', 'translation']),
-        'large-v1': ModelInfo('large-v1', '1.5GB', '1.5B', '~5%', ['transcription', 'translation']),
-        'large-v2': ModelInfo('large-v2', '1.5GB', '1.5B', '~5%', ['transcription', 'translation']),
-        'large-v3': ModelInfo('large-v3', '1.5GB', '1.5B', '5-8%', ['transcription', 'translation']),
-        'turbo': ModelInfo('turbo', '809MB', '809M', '10-12%', ['transcription', 'translation']),
+        'tiny': ModelInfo('tiny', '39MB', '39M', '~15%', ['transcription', 'translation'], 'OpenAI'),
+        'tiny.en': ModelInfo('tiny.en', '39MB', '39M', '~15%', ['transcription'], 'OpenAI'),
+        'base': ModelInfo('base', '74MB', '74M', '~10%', ['transcription', 'translation'], 'OpenAI'),
+        'base.en': ModelInfo('base.en', '74MB', '74M', '~10%', ['transcription'], 'OpenAI'),
+        'small': ModelInfo('small', '244MB', '244M', '~8%', ['transcription', 'translation'], 'OpenAI'),
+        'small.en': ModelInfo('small.en', '244MB', '244M', '~8%', ['transcription'], 'OpenAI'),
+        'medium': ModelInfo('medium', '769MB', '769M', '~6%', ['transcription', 'translation'], 'OpenAI'),
+        'medium.en': ModelInfo('medium.en', '769MB', '769M', '~6%', ['transcription'], 'OpenAI'),
+        'large': ModelInfo('large', '1.5GB', '1.5B', '~5%', ['transcription', 'translation'], 'OpenAI'),
+        'large-v1': ModelInfo('large-v1', '1.5GB', '1.5B', '~5%', ['transcription', 'translation'], 'OpenAI'),
+        'large-v2': ModelInfo('large-v2', '1.5GB', '1.5B', '~5%', ['transcription', 'translation'], 'OpenAI'),
+        'large-v3': ModelInfo('large-v3', '1.5GB', '1.5B', '5-8%', ['transcription', 'translation'], 'OpenAI'),
+        'turbo': ModelInfo('turbo', '809MB', '809M', '10-12%', ['transcription', 'translation'], 'OpenAI'),
     }
 
     def __init__(self):
@@ -107,20 +107,39 @@ class WhisperBackend(STTBackend):
             # Load model
             model = self._get_model(model_name)
 
-            # Transcribe
-            print(f"[INFO] Transcribing with Whisper {model_name}...", file=sys.stderr)
-            result = model.transcribe(audio_path, **kwargs)
+            # Load and convert audio to WAV if needed (M4A not always supported)
+            import librosa
+            import soundfile as sf
+            import tempfile
 
-            processing_time = time.time() - start_time
+            print(f"[INFO] Loading audio file: {audio_path}", file=sys.stderr)
+            # Load audio with librosa (supports M4A via audioread/ffmpeg)
+            audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
 
-            return {
-                'text': result['text'].strip(),
-                'processing_time': round(processing_time, 2),
-                'segments': result.get('segments', []),
-                'language': result.get('language', 'unknown'),
-                'model': model_name,
-                'backend': 'whisper'
-            }
+            # Save to temporary WAV file for Whisper
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                temp_wav_path = tmp_file.name
+                sf.write(temp_wav_path, audio_data, sample_rate)
+
+            try:
+                # Transcribe
+                print(f"[INFO] Transcribing with Whisper {model_name}...", file=sys.stderr)
+                result = model.transcribe(temp_wav_path, **kwargs)
+
+                processing_time = time.time() - start_time
+
+                return {
+                    'text': result['text'].strip(),
+                    'processing_time': round(processing_time, 2),
+                    'segments': result.get('segments', []),
+                    'language': result.get('language', 'unknown'),
+                    'model': model_name,
+                    'backend': 'whisper'
+                }
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_wav_path):
+                    os.unlink(temp_wav_path)
 
         except Exception as e:
             processing_time = time.time() - start_time

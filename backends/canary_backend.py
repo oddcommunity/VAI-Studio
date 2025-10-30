@@ -23,14 +23,16 @@ class CanaryBackend(STTBackend):
             '~5GB',
             '2.5B',
             '5.63%',
-            ['transcription', 'diarization', 'punctuation', 'multilingual', 'code-switching']
+            ['transcription', 'diarization', 'punctuation', 'multilingual', 'code-switching'],
+            'NVIDIA'
         ),
         'canary-1b': ModelInfo(
             'canary-1b',
             '~2GB',
             '1B',
             '~6%',
-            ['transcription', 'diarization', 'multilingual']
+            ['transcription', 'diarization', 'multilingual'],
+            'NVIDIA'
         ),
     }
 
@@ -157,23 +159,42 @@ class CanaryBackend(STTBackend):
         # Load model pipeline
         pipe = self._get_pipeline_transformers(model_name)
 
-        # Transcribe
-        print(f"Transcribing with Canary {model_name} (transformers mode)...")
-        result = pipe(audio_path)
+        # Load and convert audio to WAV if needed (M4A not always supported)
+        import librosa
+        import soundfile as sf
+        import tempfile
 
-        processing_time = time.time() - start_time
+        print(f"Loading audio file: {audio_path}")
+        # Load audio with librosa (supports M4A via audioread/ffmpeg)
+        audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
 
-        # Extract text from result
-        text = result['text'] if isinstance(result, dict) else result
+        # Save to temporary WAV file
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+            temp_wav_path = tmp_file.name
+            sf.write(temp_wav_path, audio_data, sample_rate)
 
-        return {
-            'text': text.strip(),
-            'processing_time': round(processing_time, 2),
-            'language': 'auto',  # Canary auto-detects language
-            'model': model_name,
-            'backend': 'canary',
-            'mode': 'transformers'
-        }
+        try:
+            # Transcribe
+            print(f"Transcribing with Canary {model_name} (transformers mode)...")
+            result = pipe(temp_wav_path)
+
+            processing_time = time.time() - start_time
+
+            # Extract text from result
+            text = result['text'] if isinstance(result, dict) else result
+
+            return {
+                'text': text.strip(),
+                'processing_time': round(processing_time, 2),
+                'language': 'auto',  # Canary auto-detects language
+                'model': model_name,
+                'backend': 'canary',
+                'mode': 'transformers'
+            }
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_wav_path):
+                os.unlink(temp_wav_path)
 
     def _transcribe_nemo(self, audio_path: str, model_name: str, **kwargs) -> Dict:
         """Transcribe using NeMo (full features mode with diarization)."""
@@ -182,34 +203,53 @@ class CanaryBackend(STTBackend):
         # Load model via NeMo
         model = self._get_pipeline_nemo(model_name)
 
-        # Transcribe with diarization
-        print(f"Transcribing with Canary {model_name} (NeMo mode with diarization)...")
+        # Load and convert audio to WAV if needed (M4A not always supported)
+        import librosa
+        import soundfile as sf
+        import tempfile
 
-        transcription = model.transcribe(
-            [audio_path],
-            return_hypotheses=True
-        )[0]
+        print(f"Loading audio file: {audio_path}")
+        # Load audio with librosa (supports M4A via audioread/ffmpeg)
+        audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
 
-        processing_time = time.time() - start_time
+        # Save to temporary WAV file
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+            temp_wav_path = tmp_file.name
+            sf.write(temp_wav_path, audio_data, sample_rate)
 
-        # Extract text and metadata
-        text = transcription.text if hasattr(transcription, 'text') else str(transcription)
+        try:
+            # Transcribe with diarization
+            print(f"Transcribing with Canary {model_name} (NeMo mode with diarization)...")
 
-        result = {
-            'text': text.strip(),
-            'processing_time': round(processing_time, 2),
-            'language': 'auto',
-            'model': model_name,
-            'backend': 'canary',
-            'mode': 'nemo'
-        }
+            transcription = model.transcribe(
+                [temp_wav_path],
+                return_hypotheses=True
+            )[0]
 
-        # Check for speaker labels (diarization)
-        if hasattr(transcription, 'speaker_labels'):
-            result['speakers'] = transcription.speaker_labels
-            print(f"Detected {len(set(transcription.speaker_labels))} speakers")
+            processing_time = time.time() - start_time
 
-        return result
+            # Extract text and metadata
+            text = transcription.text if hasattr(transcription, 'text') else str(transcription)
+
+            result = {
+                'text': text.strip(),
+                'processing_time': round(processing_time, 2),
+                'language': 'auto',
+                'model': model_name,
+                'backend': 'canary',
+                'mode': 'nemo'
+            }
+
+            # Check for speaker labels (diarization)
+            if hasattr(transcription, 'speaker_labels'):
+                result['speakers'] = transcription.speaker_labels
+                print(f"Detected {len(set(transcription.speaker_labels))} speakers")
+
+            return result
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_wav_path):
+                os.unlink(temp_wav_path)
 
     def list_models(self) -> List[Dict]:
         """List all available Canary models."""

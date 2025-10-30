@@ -14,26 +14,29 @@ class Wav2VecBERTBackend(STTBackend):
     """Facebook Wav2Vec2-BERT speech recognition backend - low-resource language optimization."""
 
     MODELS = {
-        'w2v-bert-2.0': ModelInfo(
-            'w2v-bert-2.0',
-            '~600MB',
-            '~600M',
-            '6-8%',
-            ['transcription', 'multilingual', 'low-resource', 'code-switching']
-        ),
-        'wav2vec2-base': ModelInfo(
-            'wav2vec2-base',
+        'wav2vec2-base-960h': ModelInfo(
+            'wav2vec2-base-960h',
             '~360MB',
             '~95M',
             '~8-10%',
-            ['transcription', 'base-model']
+            ['transcription', 'english', 'librispeech'],
+            'Meta'
         ),
-        'wav2vec2-large-xlsr-53': ModelInfo(
-            'wav2vec2-large-xlsr-53',
+        'wav2vec2-large-960h-lv60-self': ModelInfo(
+            'wav2vec2-large-960h-lv60-self',
             '~1.2GB',
             '~300M',
             '~6-8%',
-            ['transcription', 'multilingual', '53-languages']
+            ['transcription', 'english', 'high-accuracy'],
+            'Meta'
+        ),
+        'wav2vec2-large-xlsr-53-english': ModelInfo(
+            'wav2vec2-large-xlsr-53-english',
+            '~1.2GB',
+            '~300M',
+            '~6-8%',
+            ['transcription', 'multilingual', 'english', 'fine-tuned'],
+            'Meta'
         ),
     }
 
@@ -57,10 +60,14 @@ class Wav2VecBERTBackend(STTBackend):
     def _get_pipeline(self, model_name: str):
         """Load or return cached model pipeline."""
         if self._current_model_name != model_name:
-            print(f"Loading Wav2Vec-BERT model: {model_name}...")
+            print(f"Loading Wav2Vec2 model: {model_name}...")
             pipeline_fn = self._load_transformers()
 
-            model_id = f"facebook/{model_name}"
+            # Determine the correct model repository
+            if model_name == 'wav2vec2-large-xlsr-53-english':
+                model_id = f"jonatasgrosman/{model_name}"
+            else:
+                model_id = f"facebook/{model_name}"
 
             try:
                 self._current_model = pipeline_fn(
@@ -69,22 +76,20 @@ class Wav2VecBERTBackend(STTBackend):
                     device=-1  # CPU by default, use 0 for CUDA
                 )
                 self._current_model_name = model_name
-                print(f"Wav2Vec-BERT model {model_name} loaded successfully!")
+                print(f"Wav2Vec2 model {model_name} loaded successfully!")
             except Exception as e:
-                print(f"Error loading Wav2Vec-BERT model {model_name}: {e}")
-                # Some models might need explicit processor/model loading
-                print(f"Trying alternative loading method...")
+                print(f"Error loading Wav2Vec2 model {model_name}: {e}")
                 raise
 
         return self._current_model
 
-    def transcribe(self, audio_path: str, model_name: str = 'w2v-bert-2.0', **kwargs) -> Dict:
+    def transcribe(self, audio_path: str, model_name: str = 'wav2vec2-base-960h', **kwargs) -> Dict:
         """
-        Transcribe audio using Wav2Vec-BERT.
+        Transcribe audio using Wav2Vec2.
 
         Args:
             audio_path: Path to audio file
-            model_name: Wav2Vec-BERT model to use
+            model_name: Wav2Vec2 model to use
             **kwargs: Additional options (currently unused)
 
         Returns:
@@ -96,22 +101,42 @@ class Wav2VecBERTBackend(STTBackend):
             # Load model pipeline
             pipe = self._get_pipeline(model_name)
 
-            # Transcribe
-            print(f"Transcribing with Wav2Vec-BERT {model_name}...")
-            result = pipe(audio_path)
+            # Load and convert audio to WAV if needed (M4A not always supported)
+            import librosa
+            import soundfile as sf
+            import tempfile
+            import os
 
-            processing_time = time.time() - start_time
+            print(f"Loading audio file: {audio_path}")
+            # Load audio with librosa (supports M4A via audioread/ffmpeg)
+            audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
 
-            # Extract text from result
-            text = result['text'] if isinstance(result, dict) else result
+            # Save to temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                temp_wav_path = tmp_file.name
+                sf.write(temp_wav_path, audio_data, sample_rate)
 
-            return {
-                'text': text.strip(),
-                'processing_time': round(processing_time, 2),
-                'language': 'auto',  # Wav2Vec-BERT auto-detects language
-                'model': model_name,
-                'backend': 'wav2vec_bert'
-            }
+            try:
+                # Transcribe
+                print(f"Transcribing with Wav2Vec2 {model_name}...")
+                result = pipe(temp_wav_path)
+
+                processing_time = time.time() - start_time
+
+                # Extract text from result
+                text = result['text'] if isinstance(result, dict) else result
+
+                return {
+                    'text': text.strip(),
+                    'processing_time': round(processing_time, 2),
+                    'language': 'auto',  # Wav2Vec2 auto-detects language
+                    'model': model_name,
+                    'backend': 'wav2vec_bert'
+                }
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_wav_path):
+                    os.unlink(temp_wav_path)
 
         except Exception as e:
             processing_time = time.time() - start_time
@@ -124,7 +149,7 @@ class Wav2VecBERTBackend(STTBackend):
             }
 
     def list_models(self) -> List[Dict]:
-        """List all available Wav2Vec-BERT models."""
+        """List all available Wav2Vec2 models."""
         models = []
         for model_name, model_info in self.MODELS.items():
             model_dict = model_info.to_dict()
@@ -134,7 +159,7 @@ class Wav2VecBERTBackend(STTBackend):
 
     def is_model_installed(self, model_name: str) -> bool:
         """
-        Check if a Wav2Vec-BERT model is installed.
+        Check if a Wav2Vec2 model is installed.
         Models are cached by HuggingFace in ~/.cache/huggingface/hub/
         """
         cache_dir = os.path.expanduser('~/.cache/huggingface/hub')
@@ -142,18 +167,22 @@ class Wav2VecBERTBackend(STTBackend):
             return False
 
         # Check for model directory
-        # HuggingFace stores models as: models--facebook--w2v-bert-2.0
-        model_dir_name = f"models--facebook--{model_name}"
+        # HuggingFace stores models as: models--facebook--wav2vec2-base-960h or models--jonatasgrosman--...
+        if model_name == 'wav2vec2-large-xlsr-53-english':
+            model_dir_name = f"models--jonatasgrosman--{model_name}"
+        else:
+            model_dir_name = f"models--facebook--{model_name}"
+
         model_path = os.path.join(cache_dir, model_dir_name)
 
         return os.path.exists(model_path)
 
     def download_model(self, model_name: str, progress_callback=None) -> None:
         """
-        Download a Wav2Vec-BERT model.
+        Download a Wav2Vec2 model.
         HuggingFace transformers downloads automatically on first use.
         """
-        print(f"Downloading Wav2Vec-BERT model: {model_name}")
+        print(f"Downloading Wav2Vec2 model: {model_name}")
         print("(Model will download automatically on first transcription)")
 
         # Pre-load the model to trigger download
@@ -257,7 +286,7 @@ if __name__ == '__main__':
     # Test the backend
     backend = Wav2VecBERTBackend()
 
-    print("Available Wav2Vec-BERT models:")
+    print("Available Wav2Vec2 models:")
     for model in backend.list_models():
         status = "✓" if model['installed'] else "✗"
-        print(f"  {status} {model['name']:30} - {model['size']:8} - WER: {model['wer']}")
+        print(f"  {status} {model['name']:35} - {model['size']:8} - WER: {model['wer']}")

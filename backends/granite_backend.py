@@ -19,7 +19,8 @@ class GraniteBackend(STTBackend):
             '~6-7GB',
             '8B',
             '5.85%',
-            ['transcription', 'multilingual', 'llm-refinement', 'en', 'es', 'fr', 'de', 'pt']
+            ['transcription', 'multilingual', 'llm-refinement', 'en', 'es', 'fr', 'de', 'pt'],
+            'IBM'
         ),
     }
 
@@ -94,33 +95,52 @@ class GraniteBackend(STTBackend):
             # Load model pipeline
             pipe = self._get_pipeline(model_name)
 
-            # Transcribe
-            print(f"Transcribing with Granite {model_name}...")
-            if language and language != 'auto':
-                print(f"Language: {self.LANGUAGES.get(language, language)}")
+            # Load and convert audio to WAV if needed (M4A not always supported)
+            import librosa
+            import soundfile as sf
+            import tempfile
 
-            # Granite uses two-pass architecture internally
-            # First pass: ASR transcription
-            # Second pass: LLM-based refinement
-            result = pipe(
-                audio_path,
-                return_timestamps=True  # Get timestamped segments
-            )
+            print(f"Loading audio file: {audio_path}")
+            # Load audio with librosa (supports M4A via audioread/ffmpeg)
+            audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
 
-            processing_time = time.time() - start_time
+            # Save to temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                temp_wav_path = tmp_file.name
+                sf.write(temp_wav_path, audio_data, sample_rate)
 
-            # Extract text and segments
-            text = result['text'] if isinstance(result, dict) else result
-            segments = result.get('chunks', []) if isinstance(result, dict) else []
+            try:
+                # Transcribe
+                print(f"Transcribing with Granite {model_name}...")
+                if language and language != 'auto':
+                    print(f"Language: {self.LANGUAGES.get(language, language)}")
 
-            return {
-                'text': text.strip(),
-                'processing_time': round(processing_time, 2),
-                'segments': segments,
-                'language': language,
-                'model': model_name,
-                'backend': 'granite'
-            }
+                # Granite uses two-pass architecture internally
+                # First pass: ASR transcription
+                # Second pass: LLM-based refinement
+                result = pipe(
+                    temp_wav_path,
+                    return_timestamps=True  # Get timestamped segments
+                )
+
+                processing_time = time.time() - start_time
+
+                # Extract text and segments
+                text = result['text'] if isinstance(result, dict) else result
+                segments = result.get('chunks', []) if isinstance(result, dict) else []
+
+                return {
+                    'text': text.strip(),
+                    'processing_time': round(processing_time, 2),
+                    'segments': segments,
+                    'language': language,
+                    'model': model_name,
+                    'backend': 'granite'
+                }
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_wav_path):
+                    os.unlink(temp_wav_path)
 
         except Exception as e:
             processing_time = time.time() - start_time

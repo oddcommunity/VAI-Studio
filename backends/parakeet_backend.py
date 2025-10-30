@@ -14,52 +14,56 @@ class ParakeetBackend(STTBackend):
     """NVIDIA Parakeet speech recognition backend - ultra-fast ASR."""
 
     MODELS = {
-        'parakeet-tdt-0.6b-v2': ModelInfo(
-            'parakeet-tdt-0.6b-v2',
+        'parakeet-ctc-0.6b': ModelInfo(
+            'parakeet-ctc-0.6b',
             '~1.2GB',
             '600M',
-            '6.05%',
-            ['transcription', 'multilingual', 'fast']
+            '~6%',
+            ['transcription', 'ctc', 'english', 'fast', 'transformers'],
+            'NVIDIA'
         ),
-        'parakeet-tdt-1.1b': ModelInfo(
-            'parakeet-tdt-1.1b',
+        'parakeet-ctc-1.1b': ModelInfo(
+            'parakeet-ctc-1.1b',
             '~2.2GB',
             '1.1B',
-            '~5.5%',
-            ['transcription', 'multilingual', 'high-accuracy']
+            '~6%',
+            ['transcription', 'ctc', 'english', 'high-accuracy', 'transformers'],
+            'NVIDIA'
         ),
     }
 
     def __init__(self):
         super().__init__()
-        self._pipeline = None
+        self._processor = None
         self._current_model = None
         self._current_model_name = None
 
     def _load_transformers(self):
-        """Lazy load transformers module."""
+        """Lazy load transformers modules for Parakeet."""
         try:
-            from transformers import pipeline
-            return pipeline
+            from transformers import AutoProcessor, AutoModelForCTC
+            import torch
+            return AutoProcessor, AutoModelForCTC, torch
         except ImportError:
             raise ImportError(
                 "transformers library not found. Install with: "
-                "pip install transformers --break-system-packages"
+                "pip install transformers torch torchaudio --break-system-packages"
             )
 
-    def _get_pipeline(self, model_name: str):
-        """Load or return cached model pipeline."""
+    def _get_model(self, model_name: str):
+        """Load or return cached Parakeet model using transformers."""
         if self._current_model_name != model_name:
             print(f"Loading Parakeet model: {model_name}...")
-            pipeline_fn = self._load_transformers()
+            AutoProcessor, AutoModelForCTC, torch = self._load_transformers()
 
             model_id = f"nvidia/{model_name}"
 
             try:
-                self._current_model = pipeline_fn(
-                    "automatic-speech-recognition",
-                    model=model_id,
-                    device=-1  # CPU by default, use 0 for CUDA
+                # Load Parakeet model using transformers
+                self._processor = AutoProcessor.from_pretrained(model_id)
+                self._current_model = AutoModelForCTC.from_pretrained(
+                    model_id,
+                    torch_dtype=torch.float32
                 )
                 self._current_model_name = model_name
                 print(f"Parakeet model {model_name} loaded successfully!")
@@ -67,9 +71,9 @@ class ParakeetBackend(STTBackend):
                 print(f"Error loading Parakeet model {model_name}: {e}")
                 raise
 
-        return self._current_model
+        return self._current_model, self._processor
 
-    def transcribe(self, audio_path: str, model_name: str = 'parakeet-tdt-0.6b-v2', **kwargs) -> Dict:
+    def transcribe(self, audio_path: str, model_name: str = 'parakeet-ctc-0.6b', **kwargs) -> Dict:
         """
         Transcribe audio using Parakeet.
 
@@ -84,22 +88,32 @@ class ParakeetBackend(STTBackend):
         start_time = time.time()
 
         try:
-            # Load model pipeline
-            pipe = self._get_pipeline(model_name)
+            # Load transformers model and processor
+            model, processor = self._get_model(model_name)
 
-            # Transcribe
+            # Load audio file
             print(f"Transcribing with Parakeet {model_name}...")
-            result = pipe(audio_path)
+            import librosa
+            import torch
+            audio, sr = librosa.load(audio_path, sr=16000)
+
+            # Process audio with the processor
+            inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
+
+            # Run inference
+            with torch.no_grad():
+                logits = model(**inputs).logits
+
+            # Decode the predicted tokens
+            predicted_ids = logits.argmax(dim=-1)
+            transcription = processor.batch_decode(predicted_ids)[0]
 
             processing_time = time.time() - start_time
 
-            # Parakeet returns {'text': '...'} via transformers pipeline
-            text = result['text'] if isinstance(result, dict) else result
-
             return {
-                'text': text.strip(),
+                'text': transcription.strip(),
                 'processing_time': round(processing_time, 2),
-                'language': 'auto',  # Parakeet auto-detects 100+ languages
+                'language': 'auto',  # Parakeet supports multiple languages
                 'model': model_name,
                 'backend': 'parakeet'
             }
@@ -142,14 +156,14 @@ class ParakeetBackend(STTBackend):
     def download_model(self, model_name: str, progress_callback=None) -> None:
         """
         Download a Parakeet model.
-        HuggingFace transformers downloads automatically on first use.
+        NeMo downloads models automatically from NGC/HuggingFace on first use.
         """
         print(f"Downloading Parakeet model: {model_name}")
         print("(Model will download automatically on first transcription)")
 
         # Pre-load the model to trigger download
         try:
-            pipe = self._get_pipeline(model_name)
+            model = self._get_model(model_name)
             print(f"Model {model_name} is ready!")
         except Exception as e:
             print(f"Error downloading model: {e}")

@@ -94,7 +94,8 @@ async function loadBackends() {
     const result = await window.electronAPI.listBackends();
     if (result.success) {
       state.backends = result.backends;
-      populateBackendSelect();
+      // Always populate the unified model dropdown showing all backends
+      populateAllModelsForComparison();
     } else {
       showError('Failed to load backends: ' + result.error);
     }
@@ -125,10 +126,41 @@ function populateModelSelects(backend) {
       const option = document.createElement('option');
       option.value = JSON.stringify({ backend, model: model.name });
       const installed = model.installed ? ' ✓' : '';
-      option.textContent = model.name + ' (' + model.size + ', WER: ' + model.wer + ')' + installed;
+      const company = model.company ? ` (${model.company})` : '';
+      option.textContent = `${model.name}${company} (~${model.size}, WER: ${model.wer})${installed}`;
       select.appendChild(option);
     });
   });
+  elements.modelSelect.disabled = false;
+}
+
+// Populate model dropdowns with ALL models from ALL backends for cross-backend comparison
+function populateAllModelsForComparison() {
+  // Populate all three selects with all models from all backends
+  [elements.modelSelect, elements.modelSelect2, elements.modelSelect3].forEach(select => {
+    select.innerHTML = '<option value="">Select a model</option>';
+
+    // Group models by backend
+    Object.keys(state.backends).forEach(backendName => {
+      const backend = state.backends[backendName];
+
+      // Create optgroup for this backend
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = `${backend.name} (${backend.models.length} models)`;
+
+      backend.models.forEach(model => {
+        const option = document.createElement('option');
+        option.value = JSON.stringify({ backend: backendName, model: model.name });
+        const installed = model.installed ? ' ✓' : '';
+        const company = model.company ? ` (${model.company})` : '';
+        option.textContent = `${model.name}${company} (~${model.size}, WER: ${model.wer})${installed}`;
+        optgroup.appendChild(option);
+      });
+
+      select.appendChild(optgroup);
+    });
+  });
+
   elements.modelSelect.disabled = false;
 }
 
@@ -147,7 +179,15 @@ function setupEventListeners() {
     const backend = e.target.value;
     if (backend) {
       state.selectedBackend = backend;
-      populateModelSelects(backend);
+
+      // If comparison mode is active, show all models from all backends
+      // Otherwise, show only models from the selected backend
+      if (state.comparisonMode) {
+        populateAllModelsForComparison();
+      } else {
+        populateModelSelects(backend);
+      }
+
       updateModelInfo();
       updateTranscribeButton();
     }
@@ -161,6 +201,15 @@ function setupEventListeners() {
   elements.comparisonMode.addEventListener('change', (e) => {
     state.comparisonMode = e.target.checked;
     elements.comparisonOptions.classList.toggle('hidden', !state.comparisonMode);
+
+    // When comparison mode is enabled, show all models from all backends
+    // When disabled, show only models from the selected backend
+    if (state.comparisonMode) {
+      populateAllModelsForComparison();
+    } else if (state.selectedBackend) {
+      populateModelSelects(state.selectedBackend);
+    }
+
     updateTranscribeButton();
   });
   

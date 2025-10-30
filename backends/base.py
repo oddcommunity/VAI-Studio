@@ -117,12 +117,13 @@ class ModelInfo:
     """Helper class to store model information."""
 
     def __init__(self, name: str, size: str, params: str, wer: str,
-                 features: Optional[List[str]] = None):
+                 features: Optional[List[str]] = None, company: Optional[str] = None):
         self.name = name
         self.size = size
         self.params = params
         self.wer = wer
         self.features = features or []
+        self.company = company
         self.installed = False
 
     def to_dict(self) -> Dict:
@@ -132,5 +133,6 @@ class ModelInfo:
             'params': self.params,
             'wer': self.wer,
             'features': self.features,
+            'company': self.company,
             'installed': self.installed
         }
