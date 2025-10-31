@@ -6,6 +6,7 @@ Provides a unified interface for different STT model families.
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 import time
+import os
 
 
 class STTBackend(ABC):
@@ -13,6 +14,24 @@ class STTBackend(ABC):
 
     def __init__(self):
         self.name = self.__class__.__name__.replace('Backend', '')
+
+    def _get_hf_token(self) -> Optional[str]:
+        """
+        Get HuggingFace authentication token from cache.
+
+        Returns:
+            Token string if found, None otherwise
+        """
+        token_path = os.path.expanduser('~/.cache/huggingface/token')
+        if os.path.exists(token_path):
+            try:
+                with open(token_path, 'r') as f:
+                    token = f.read().strip()
+                    if token:
+                        return token
+            except Exception as e:
+                print(f"[Warning] Could not read HuggingFace token: {e}")
+        return None
 
     @abstractmethod
     def transcribe(self, audio_path: str, model_name: str, **kwargs) -> Dict:

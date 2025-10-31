@@ -13,6 +13,11 @@ let state = {
   batchProcessing: false
 };
 
+// Model Selector Instances
+let modelSelector = null;
+let modelSelector2 = null;
+let modelSelector3 = null;
+
 // ========================================
 // TOAST NOTIFICATION SYSTEM
 // ========================================
@@ -60,15 +65,13 @@ function showToast(message, type = 'info', duration = 3000) {
 const elements = {
   selectFileBtn: document.getElementById('select-file-btn'),
   selectMultipleFilesBtn: document.getElementById('select-multiple-files-btn'),
+  removeFileBtn: document.getElementById('remove-file-btn'),
   fileInfo: document.getElementById('file-info'),
   batchQueue: document.getElementById('batch-queue'),
   backendSelect: document.getElementById('backend-select'),
-  modelSelect: document.getElementById('model-select'),
   modelInfo: document.getElementById('model-info'),
   comparisonMode: document.getElementById('comparison-mode'),
   comparisonOptions: document.getElementById('comparison-options'),
-  modelSelect2: document.getElementById('model-select-2'),
-  modelSelect3: document.getElementById('model-select-3'),
   transcribeBtn: document.getElementById('transcribe-btn'),
   transcribeBatchBtn: document.getElementById('transcribe-batch-btn'),
   batchProgress: document.getElementById('batch-progress'),
@@ -85,7 +88,77 @@ async function init() {
   console.log('Initializing LocalVoice AI...');
   await loadBackends();
   setupEventListeners();
+  setupProgressListener();
   console.log('Initialization complete');
+}
+
+// State for tracking comparison mode progress
+let comparisonProgress = {
+  currentModel: 0,
+  totalModels: 1
+};
+
+// Setup progress event listener
+function setupProgressListener() {
+  window.electronAPI.onProgress((progressData) => {
+    console.log('[Progress]', progressData);
+
+    // Adjust progress for comparison mode
+    let adjustedProgress = progressData.progress;
+    let adjustedMessage = progressData.message;
+    let stage = progressData.stage;
+
+    if (comparisonProgress.totalModels > 1) {
+      // Calculate cumulative progress across all models
+      const progressPerModel = 100 / comparisonProgress.totalModels;
+      const baseProgress = comparisonProgress.currentModel * progressPerModel;
+      adjustedProgress = baseProgress + (progressData.progress * progressPerModel / 100);
+
+      // Add model indicator to message
+      adjustedMessage = `Model ${comparisonProgress.currentModel + 1}/${comparisonProgress.totalModels}: ${progressData.message}`;
+    }
+
+    updateProgress(adjustedProgress, adjustedMessage, stage);
+  });
+}
+
+// Update progress bar and message
+function updateProgress(progress, message, stage) {
+  console.log('[Frontend] Updating progress:', progress, '%', message, 'stage:', stage);
+
+  const progressFill = document.getElementById('loading-progress-fill');
+  const progressText = document.getElementById('loading-progress-text');
+  const loadingDetails = elements.loadingScreen.querySelector('.loading-details');
+  const loadingText = elements.loadingScreen.querySelector('.loading-text');
+
+  console.log('[Frontend] Elements found:', {
+    progressFill: !!progressFill,
+    progressText: !!progressText,
+    loadingDetails: !!loadingDetails,
+    loadingText: !!loadingText
+  });
+
+  // Update header based on stage
+  if (loadingText) {
+    if (stage === 'downloading') {
+      loadingText.textContent = 'Downloading model...';
+    } else {
+      loadingText.textContent = 'Processing audio...';
+    }
+  }
+
+  if (progressFill) {
+    progressFill.style.width = `${progress}%`;
+    console.log('[Frontend] Set progress fill width to:', progressFill.style.width);
+  }
+
+  if (progressText) {
+    progressText.textContent = `${Math.round(progress)}%`;
+  }
+
+  if (loadingDetails && message) {
+    loadingDetails.textContent = message;
+  }
 }
 
 // Load available backends and models
@@ -94,14 +167,40 @@ async function loadBackends() {
     const result = await window.electronAPI.listBackends();
     if (result.success) {
       state.backends = result.backends;
-      // Always populate the unified model dropdown showing all backends
-      populateAllModelsForComparison();
+
+      // Initialize main model selector
+      if (!modelSelector) {
+        modelSelector = new ModelSelector('model-select-container', {
+          placeholder: 'Select a model',
+          showSearch: true,
+          onChange: (selection) => {
+            console.log('Model selected:', selection);
+            updateModelInfoFromSelection(selection);
+            updateTranscribeButton();
+          }
+        });
+      }
+
+      modelSelector.setModels(result.backends);
     } else {
       showError('Failed to load backends: ' + result.error);
     }
   } catch (error) {
     showError('Error loading backends: ' + error.message);
   }
+}
+
+// Update model info from selector
+function updateModelInfoFromSelection(selection) {
+  if (!selection) {
+    elements.modelInfo.classList.add('hidden');
+    return;
+  }
+
+  const model = selection.data;
+  elements.modelInfo.classList.remove('hidden');
+  elements.modelInfo.querySelector('.model-size').textContent = 'Size: ' + model.size;
+  elements.modelInfo.querySelector('.model-wer').textContent = 'WER: ' + model.wer;
 }
 
 // Populate backend dropdown
@@ -117,7 +216,9 @@ function populateBackendSelect() {
   }
 }
 
-// Populate model dropdowns
+// OLD POPULATE FUNCTIONS - No longer needed with ModelSelector component
+// Commented out but kept for reference
+/*
 function populateModelSelects(backend) {
   const models = state.backends[backend].models;
   [elements.modelSelect, elements.modelSelect2, elements.modelSelect3].forEach(select => {
@@ -134,17 +235,13 @@ function populateModelSelects(backend) {
   elements.modelSelect.disabled = false;
 }
 
-// Populate model dropdowns with ALL models from ALL backends for cross-backend comparison
 function populateAllModelsForComparison() {
-  // Populate all three selects with all models from all backends
   [elements.modelSelect, elements.modelSelect2, elements.modelSelect3].forEach(select => {
     select.innerHTML = '<option value="">Select a model</option>';
 
-    // Group models by backend
     Object.keys(state.backends).forEach(backendName => {
       const backend = state.backends[backendName];
 
-      // Create optgroup for this backend
       const optgroup = document.createElement('optgroup');
       optgroup.label = `${backend.name} (${backend.models.length} models)`;
 
@@ -163,6 +260,7 @@ function populateAllModelsForComparison() {
 
   elements.modelSelect.disabled = false;
 }
+*/
 
 // Set up event listeners
 function setupEventListeners() {
@@ -174,14 +272,21 @@ function setupEventListeners() {
       updateTranscribeButton();
     }
   });
-  
+
+  // Remove selected file
+  elements.removeFileBtn.addEventListener('click', () => {
+    state.selectedFile = null;
+    elements.fileInfo.classList.add('hidden');
+    updateTranscribeButton();
+  });
+
+  // Backend select no longer needed - ModelSelector shows all backends in one dropdown
+  /*
   elements.backendSelect.addEventListener('change', (e) => {
     const backend = e.target.value;
     if (backend) {
       state.selectedBackend = backend;
 
-      // If comparison mode is active, show all models from all backends
-      // Otherwise, show only models from the selected backend
       if (state.comparisonMode) {
         populateAllModelsForComparison();
       } else {
@@ -192,22 +297,42 @@ function setupEventListeners() {
       updateTranscribeButton();
     }
   });
-  
+
   elements.modelSelect.addEventListener('change', () => {
     updateModelInfo();
     updateTranscribeButton();
   });
-  
+  */
+
   elements.comparisonMode.addEventListener('change', (e) => {
     state.comparisonMode = e.target.checked;
     elements.comparisonOptions.classList.toggle('hidden', !state.comparisonMode);
 
-    // When comparison mode is enabled, show all models from all backends
-    // When disabled, show only models from the selected backend
     if (state.comparisonMode) {
-      populateAllModelsForComparison();
-    } else if (state.selectedBackend) {
-      populateModelSelects(state.selectedBackend);
+      // Initialize additional selectors for comparison mode
+      if (!modelSelector2) {
+        modelSelector2 = new ModelSelector('model-select-2-container', {
+          placeholder: 'Select second model',
+          showSearch: true,
+          onChange: (selection) => {
+            console.log('Second model selected:', selection);
+            updateTranscribeButton();
+          }
+        });
+        modelSelector2.setModels(state.backends);
+      }
+
+      if (!modelSelector3) {
+        modelSelector3 = new ModelSelector('model-select-3-container', {
+          placeholder: 'Select third model (optional)',
+          showSearch: true,
+          onChange: (selection) => {
+            console.log('Third model selected:', selection);
+            updateTranscribeButton();
+          }
+        });
+        modelSelector3.setModels(state.backends);
+      }
     }
 
     updateTranscribeButton();
@@ -236,7 +361,8 @@ async function showFileInfo(filePath) {
   }
 }
 
-// Update model info display
+// OLD updateModelInfo - Replaced by updateModelInfoFromSelection
+/*
 function updateModelInfo() {
   const selectedValue = elements.modelSelect.value;
   if (!selectedValue) {
@@ -255,40 +381,50 @@ function updateModelInfo() {
     console.error('Error parsing model selection:', e);
   }
 }
+*/
 
 // Update transcribe button state
 function updateTranscribeButton() {
   const hasFile = state.selectedFile !== null;
-  const hasModel = elements.modelSelect.value !== '';
-  const hasModels = state.comparisonMode 
-    ? hasModel && elements.modelSelect2.value !== ''
+  const hasModel = modelSelector && modelSelector.getValue() !== '';
+  const hasModels = state.comparisonMode
+    ? hasModel && modelSelector2 && modelSelector2.getValue() !== ''
     : hasModel;
   elements.transcribeBtn.disabled = !(hasFile && hasModels);
 }
 
 // Handle transcription
 async function handleTranscribe() {
-  const models = [elements.modelSelect.value];
+  const models = [modelSelector.getValue()];
   if (state.comparisonMode) {
-    models.push(elements.modelSelect2.value);
-    if (elements.modelSelect3.value) {
-      models.push(elements.modelSelect3.value);
+    models.push(modelSelector2.getValue());
+    if (modelSelector3 && modelSelector3.getValue()) {
+      models.push(modelSelector3.getValue());
     }
   }
-  
+
   elements.welcomeScreen.classList.add('hidden');
   elements.resultsContainer.classList.add('hidden');
   elements.loadingScreen.classList.remove('hidden');
   elements.resultsContainer.innerHTML = '';
-  
+
+  // Set up comparison mode progress tracking
+  comparisonProgress.totalModels = models.length;
+  comparisonProgress.currentModel = 0;
+
+  // Reset progress bar
+  updateProgress(0, 'Initializing...');
+
   state.activeTranscriptions = models.length;
   const results = [];
-  
-  for (const modelStr of models) {
+
+  for (let i = 0; i < models.length; i++) {
+    const modelStr = models[i];
     const { backend, model } = JSON.parse(modelStr);
-    elements.loadingScreen.querySelector('.loading-details').textContent = 
-      'Processing with ' + backend + '/' + model + '...';
-    
+
+    // Update which model we're processing
+    comparisonProgress.currentModel = i;
+
     try {
       const result = await window.electronAPI.transcribe({
         audioPath: state.selectedFile,
@@ -301,7 +437,11 @@ async function handleTranscribe() {
       results.push({ backend, model, result: { success: false, error: error.message } });
     }
   }
-  
+
+  // Reset comparison progress
+  comparisonProgress.totalModels = 1;
+  comparisonProgress.currentModel = 0;
+
   elements.loadingScreen.classList.add('hidden');
   elements.resultsContainer.classList.remove('hidden');
   displayResults(results);
@@ -461,7 +601,7 @@ function clearBatch() {
 // Update batch button visibility
 function updateBatchButton() {
   const hasFiles = state.batchFiles.length > 0;
-  const hasModel = elements.modelSelect.value !== '';
+  const hasModel = modelSelector && modelSelector.getValue() !== '';
 
   if (hasFiles) {
     elements.transcribeBatchBtn.classList.remove('hidden');
@@ -481,7 +621,7 @@ async function handleBatchTranscribe() {
     return;
   }
 
-  const modelStr = elements.modelSelect.value;
+  const modelStr = modelSelector.getValue();
   if (!modelStr) {
     showToast('Please select a model', 'error');
     return;
@@ -778,7 +918,7 @@ if (settingsModal) {
 
 function openSettingsModal() {
   if (!settingsModal) return;
-  
+
   // Populate modal with current settings
   document.getElementById('device-preference').value = userSettings.devicePreference;
   document.getElementById('quantization').value = userSettings.quantization;
@@ -790,8 +930,11 @@ function openSettingsModal() {
   document.getElementById('auto-scroll').checked = userSettings.autoScroll;
   document.getElementById('show-notifications').checked = userSettings.showNotifications;
   document.getElementById('font-size').value = userSettings.fontSize;
-  
+
   settingsModal.classList.remove('hidden');
+
+  // Load HuggingFace token
+  loadHFToken();
 }
 
 function closeSettingsModal() {
@@ -833,8 +976,137 @@ function showNotification(message, type = 'info') {
 // Load settings on init
 loadSettings();
 
+// ========================================
+// HUGGINGFACE AUTHENTICATION
+// ========================================
 
+// Wait for DOM to load before setting up HF authentication
+document.addEventListener('DOMContentLoaded', () => {
+  // HuggingFace Authentication Elements
+  const hfTokenInput = document.getElementById('hf-token-input');
+  const hfTokenLink = document.getElementById('hf-token-link');
+  const testHFTokenBtn = document.getElementById('test-hf-token-btn');
+  const saveHFTokenBtn = document.getElementById('save-hf-token-btn');
+  const clearHFTokenBtn = document.getElementById('clear-hf-token-btn');
+  const hfStatus = document.getElementById('hf-status');
+  const hfStatusText = document.getElementById('hf-status-text');
 
+  function showHFStatus(message, type) {
+    if (!hfStatus || !hfStatusText) return;
+
+    hfStatus.style.display = 'block';
+    hfStatusText.textContent = message;
+
+    if (type === 'success') {
+      hfStatus.style.backgroundColor = '#dcfce7';
+      hfStatus.style.borderLeft = '4px solid #16a34a';
+      hfStatus.style.color = '#166534';
+    } else if (type === 'error') {
+      hfStatus.style.backgroundColor = '#fee2e2';
+      hfStatus.style.borderLeft = '4px solid #dc2626';
+      hfStatus.style.color = '#991b1b';
+    } else {
+      hfStatus.style.backgroundColor = '#dbeafe';
+      hfStatus.style.borderLeft = '4px solid #2563eb';
+      hfStatus.style.color = '#1e40af';
+    }
+
+    setTimeout(() => {
+      hfStatus.style.display = 'none';
+    }, 5000);
+  }
+
+  // Load saved token when settings modal opens
+  async function loadHFToken() {
+    if (!hfTokenInput) return;
+
+    try {
+      const result = await window.electronAPI.getHFToken();
+      if (result.success && result.token) {
+        hfTokenInput.value = result.token;
+        showHFStatus('Token loaded successfully', 'success');
+      }
+    } catch (error) {
+      console.error('Error loading HF token:', error);
+    }
+  }
+
+  // Test token
+  if (testHFTokenBtn) {
+    testHFTokenBtn.addEventListener('click', async () => {
+      const token = hfTokenInput.value.trim();
+
+      if (!token) {
+        showHFStatus('Please enter a token first', 'error');
+        return;
+      }
+
+      testHFTokenBtn.disabled = true;
+      testHFTokenBtn.textContent = 'Testing...';
+
+      const result = await window.electronAPI.testHFToken(token);
+
+      testHFTokenBtn.disabled = false;
+      testHFTokenBtn.textContent = 'Test Token';
+
+      if (result.success && result.valid) {
+        const username = result.username ? ` (${result.username})` : '';
+        showHFStatus(`Token is valid${username}`, 'success');
+      } else {
+        showHFStatus(`${result.error || 'Invalid token'}`, 'error');
+      }
+    });
+  }
+
+  // Save token
+  if (saveHFTokenBtn) {
+    saveHFTokenBtn.addEventListener('click', async () => {
+      const token = hfTokenInput.value.trim();
+
+      if (!token) {
+        showHFStatus('Please enter a token first', 'error');
+        return;
+      }
+
+      saveHFTokenBtn.disabled = true;
+      saveHFTokenBtn.textContent = 'Saving...';
+
+      const result = await window.electronAPI.saveHFToken(token);
+
+      saveHFTokenBtn.disabled = false;
+      saveHFTokenBtn.textContent = 'Save Token';
+
+      if (result.success) {
+        showHFStatus('Token saved successfully', 'success');
+      } else {
+        showHFStatus(`Failed to save token: ${result.error}`, 'error');
+      }
+    });
+  }
+
+  // Clear token
+  if (clearHFTokenBtn) {
+    clearHFTokenBtn.addEventListener('click', async () => {
+      const result = await window.electronAPI.clearHFToken();
+
+      if (result.success) {
+        hfTokenInput.value = '';
+        showHFStatus('Token cleared successfully', 'success');
+      } else {
+        showHFStatus(`Failed to clear token: ${result.error}`, 'error');
+      }
+    });
+  }
+
+  // Open HuggingFace token page
+  if (hfTokenLink) {
+    hfTokenLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await window.electronAPI.openHFTokenPage();
+    });
+  }
+});
+// End of HuggingFace Authentication DOMContentLoaded
 
 // Model Manager
 const modelManagerModal = document.getElementById('model-manager-modal');

@@ -16,7 +16,6 @@ from voxtral_backend import VoxtralBackend
 from parakeet_backend import ParakeetBackend
 from granite_backend import GraniteBackend
 from wav2vec_bert_backend import Wav2VecBERTBackend
-from canary_backend import CanaryBackend
 
 
 # Registry of available backends
@@ -26,7 +25,6 @@ BACKENDS = {
     'parakeet': ParakeetBackend,
     'granite': GraniteBackend,
     'wav2vec_bert': Wav2VecBERTBackend,
-    'canary': CanaryBackend,
 }
 
 
@@ -154,40 +152,9 @@ def main():
                 'message': 'Model download initiated'
             })
 
-        elif command == 'benchmark':
-            # Run benchmark
-            if len(sys.argv) < 6:
-                print_error("Usage: runner.py benchmark <backend> <audio_path> <model_name> <reference_text>")
-                sys.exit(1)
-
-            backend_name = sys.argv[2]
-            audio_path = sys.argv[3]
-            model_name = sys.argv[4]
-            reference_text = sys.argv[5]
-
-            if backend_name not in BACKENDS:
-                print_error(f"Unknown backend: {backend_name}")
-                sys.exit(1)
-
-            if not os.path.exists(audio_path):
-                print_error(f"Audio file not found: {audio_path}")
-                sys.exit(1)
-
-            backend = BACKENDS[backend_name]()
-
-            print(f"[INFO] Running benchmark: {audio_path}", file=sys.stderr)
-            print(f"[INFO] Backend: {backend_name}", file=sys.stderr)
-            print(f"[INFO] Model: {model_name}", file=sys.stderr)
-            print(f"[INFO] Reference: {reference_text}", file=sys.stderr)
-
-            result = backend.benchmark(audio_path, model_name, reference_text)
-
-            result['success'] = 'error' not in result
-            print_json(result)
-
         else:
             print_error(f"Unknown command: {command}")
-            print_error("Available commands: list-backends, list-models, transcribe, download, benchmark")
+            print_error("Available commands: list-backends, list-models, transcribe, download")
             sys.exit(1)
 
     except Exception as e:

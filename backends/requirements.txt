@@ -12,14 +12,12 @@ pillow>=10.0.0
 # Whisper backend
 openai-whisper>=20231117
 faster-whisper>=0.10.0
+compressed-tensors>=0.12.0  # Required for quantized Whisper models
 
 # Voxtral backend (Mistral AI)
 mistral-common>=1.0.0
 
 # Parakeet backend (NVIDIA - uses transformers)
-# Uses transformers (already included)
-
-# Canary backend
 # Uses transformers (already included)
 
 # Granite backend

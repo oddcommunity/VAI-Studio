@@ -8,6 +8,7 @@ import time
 import os
 from typing import Dict, List
 from base import STTBackend, ModelInfo
+from progress import report_progress
 
 
 class Wav2VecBERTBackend(STTBackend):
@@ -60,6 +61,13 @@ class Wav2VecBERTBackend(STTBackend):
     def _get_pipeline(self, model_name: str):
         """Load or return cached model pipeline."""
         if self._current_model_name != model_name:
+            is_downloading = not self.is_model_installed(model_name)
+
+            if is_downloading:
+                report_progress(10, f'Downloading {model_name}...', 'downloading')
+            else:
+                report_progress(10, f'Loading {model_name} model...', 'loading_model')
+
             print(f"Loading Wav2Vec2 model: {model_name}...")
             pipeline_fn = self._load_transformers()
 
@@ -70,14 +78,35 @@ class Wav2VecBERTBackend(STTBackend):
                 model_id = f"facebook/{model_name}"
 
             try:
+                if is_downloading:
+                    report_progress(15, 'Downloading model files from HuggingFace...', 'downloading')
+
+                # Get HuggingFace token for authentication
+                token = self._get_hf_token()
+
                 self._current_model = pipeline_fn(
                     "automatic-speech-recognition",
                     model=model_id,
-                    device=-1  # CPU by default, use 0 for CUDA
+                    device=-1,  # CPU by default, use 0 for CUDA
+                    token=token
                 )
                 self._current_model_name = model_name
+
+                if is_downloading:
+                    report_progress(30, 'Download complete! Model loaded.', 'loaded')
+                else:
+                    report_progress(30, 'Model loaded successfully', 'loaded')
+
                 print(f"Wav2Vec2 model {model_name} loaded successfully!")
             except Exception as e:
+                error_msg = str(e).lower()
+                # Check for authentication errors
+                if '401' in error_msg or '403' in error_msg or 'authentication' in error_msg or 'unauthorized' in error_msg:
+                    print(f"Error loading Wav2Vec2 model {model_name}: Authentication failed")
+                    raise Exception(
+                        "HuggingFace authentication required. Please add your HuggingFace token in Settings > Advanced Settings > HuggingFace Authentication. "
+                        "Get a free token at https://huggingface.co/settings/tokens"
+                    )
                 print(f"Error loading Wav2Vec2 model {model_name}: {e}")
                 raise
 
@@ -98,15 +127,23 @@ class Wav2VecBERTBackend(STTBackend):
         start_time = time.time()
 
         try:
-            # Load model pipeline
+            report_progress(0, 'Starting transcription...', 'initializing')
+
+            # Check if model needs to be downloaded
+            if not self.is_model_installed(model_name):
+                model_size = self.MODELS.get(model_name, ModelInfo('unknown', '~1.2GB', '', '', [], '')).size
+                report_progress(5, f'Model not installed. Downloading {model_name} ({model_size})...', 'downloading')
+                print(f"[DOWNLOAD] Model {model_name} not found in cache. Downloading...")
+
+            # Load model pipeline (will download if needed)
             pipe = self._get_pipeline(model_name)
 
             # Load and convert audio to WAV if needed (M4A not always supported)
             import librosa
             import soundfile as sf
             import tempfile
-            import os
 
+            report_progress(35, 'Loading audio file...', 'loading_audio')
             print(f"Loading audio file: {audio_path}")
             # Load audio with librosa (supports M4A via audioread/ffmpeg)
             audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
@@ -117,18 +154,23 @@ class Wav2VecBERTBackend(STTBackend):
                 sf.write(temp_wav_path, audio_data, sample_rate)
 
             try:
-                # Transcribe
+                # Transcribe with timestamps enabled for long audio support
+                report_progress(50, 'Transcribing audio...', 'transcribing')
                 print(f"Transcribing with Wav2Vec2 {model_name}...")
-                result = pipe(temp_wav_path)
+                result = pipe(temp_wav_path, return_timestamps=True)
 
                 processing_time = time.time() - start_time
 
-                # Extract text from result
+                report_progress(90, 'Processing results...', 'finalizing')
+
+                # Extract text and segments from result
                 text = result['text'] if isinstance(result, dict) else result
+                segments = result.get('chunks', []) if isinstance(result, dict) else []
 
                 return {
                     'text': text.strip(),
                     'processing_time': round(processing_time, 2),
+                    'segments': segments,
                     'language': 'auto',  # Wav2Vec2 auto-detects language
                     'model': model_name,
                     'backend': 'wav2vec_bert'

@@ -1,16 +1,17 @@
 {
-  "name": "localvoice-ai",
+  "name": "vai-studio",
   "version": "3.0.0",
-  "description": "LM Studio for Speech-to-Text - Test and compare STT models locally",
+  "description": "VAI Studio - Test and compare Speech-to-Text models locally",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux",
-    "build:all": "electron-builder --mac --win --linux"
+    "prebuild": "./scripts/prepare-python-bundle.sh",
+    "build": "npm run prebuild && electron-builder",
+    "build:mac": "npm run prebuild && electron-builder --mac",
+    "build:win": "npm run prebuild && electron-builder --win",
+    "build:linux": "npm run prebuild && electron-builder --linux",
+    "build:all": "npm run prebuild && electron-builder --mac --win --linux"
   },
   "keywords": [
     "speech-to-text",
@@ -22,15 +23,15 @@
     "stt",
     "transcription-tool"
   ],
-  "author": "LocalVoice AI",
+  "author": "VAI Studio",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/localvoice-ai"
+    "url": "https://github.com/yourusername/vai-studio"
   },
   "build": {
-    "appId": "com.localvoiceai.app",
-    "productName": "LocalVoice AI",
+    "appId": "com.vaistudio.app",
+    "productName": "VAI Studio",
     "directories": {
       "output": "dist"
     },
@@ -44,12 +45,13 @@
     ],
     "extraResources": [
       {
-        "from": "backends",
+        "from": "backends-bundle",
         "to": "backends",
         "filter": [
-          "**/*.py",
-          "!__pycache__",
-          "!*.pyc"
+          "**/*",
+          "!**/__pycache__",
+          "!**/*.pyc",
+          "!**/*.pyo"
         ]
       },
       {
@@ -91,10 +93,11 @@
     "publish": {
       "provider": "github",
       "owner": "yourusername",
-      "repo": "localvoice-ai"
+      "repo": "vai-studio"
     }
   },
   "dependencies": {
+    "electron-store": "^11.0.2",
     "electron-updater": "^6.1.7"
   },
   "devDependencies": {

@@ -32,6 +32,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Save dialog
   saveDialog: (defaultPath, filters) => ipcRenderer.invoke('save-dialog', { defaultPath, filters }),
+
+  // Progress event listeners
+  onProgress: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('transcription-progress', subscription);
+    // Return unsubscribe function
+    return () => {
+      ipcRenderer.removeListener('transcription-progress', subscription);
+    };
+  },
+
+  // HuggingFace Authentication
+  saveHFToken: (token) => ipcRenderer.invoke('save-hf-token', token),
+  getHFToken: () => ipcRenderer.invoke('get-hf-token'),
+  clearHFToken: () => ipcRenderer.invoke('clear-hf-token'),
+  openHFTokenPage: () => ipcRenderer.invoke('open-hf-token-page'),
+  testHFToken: (token) => ipcRenderer.invoke('test-hf-token', token),
 });
 
 console.log('Preload script loaded');

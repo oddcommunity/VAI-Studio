@@ -8,6 +8,7 @@ import time
 import os
 from typing import Dict, List
 from base import STTBackend, ModelInfo
+from progress import report_progress
 
 
 class ParakeetBackend(STTBackend):
@@ -53,21 +54,49 @@ class ParakeetBackend(STTBackend):
     def _get_model(self, model_name: str):
         """Load or return cached Parakeet model using transformers."""
         if self._current_model_name != model_name:
+            is_downloading = not self.is_model_installed(model_name)
+
+            if is_downloading:
+                report_progress(10, f'Downloading {model_name}...', 'downloading')
+            else:
+                report_progress(10, f'Loading {model_name} model...', 'loading_model')
+
             print(f"Loading Parakeet model: {model_name}...")
             AutoProcessor, AutoModelForCTC, torch = self._load_transformers()
 
             model_id = f"nvidia/{model_name}"
 
             try:
+                if is_downloading:
+                    report_progress(15, 'Downloading model files from HuggingFace...', 'downloading')
+
+                # Get HuggingFace token for authentication
+                token = self._get_hf_token()
+
                 # Load Parakeet model using transformers
-                self._processor = AutoProcessor.from_pretrained(model_id)
+                self._processor = AutoProcessor.from_pretrained(model_id, token=token)
                 self._current_model = AutoModelForCTC.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float32
+                    torch_dtype=torch.float32,
+                    token=token
                 )
                 self._current_model_name = model_name
+
+                if is_downloading:
+                    report_progress(30, 'Download complete! Model loaded.', 'loaded')
+                else:
+                    report_progress(30, 'Model loaded successfully', 'loaded')
+
                 print(f"Parakeet model {model_name} loaded successfully!")
             except Exception as e:
+                error_msg = str(e).lower()
+                # Check for authentication errors
+                if '401' in error_msg or '403' in error_msg or 'authentication' in error_msg or 'unauthorized' in error_msg:
+                    print(f"Error loading Parakeet model {model_name}: Authentication failed")
+                    raise Exception(
+                        "HuggingFace authentication required. Please add your HuggingFace token in Settings > Advanced Settings > HuggingFace Authentication. "
+                        "Get a free token at https://huggingface.co/settings/tokens"
+                    )
                 print(f"Error loading Parakeet model {model_name}: {e}")
                 raise
 
@@ -88,16 +117,26 @@ class ParakeetBackend(STTBackend):
         start_time = time.time()
 
         try:
-            # Load transformers model and processor
+            report_progress(0, 'Starting transcription...', 'initializing')
+
+            # Check if model needs to be downloaded
+            if not self.is_model_installed(model_name):
+                model_size = self.MODELS.get(model_name, ModelInfo('unknown', '~2GB', '', '', [], '')).size
+                report_progress(5, f'Model not installed. Downloading {model_name} ({model_size})...', 'downloading')
+                print(f"[DOWNLOAD] Model {model_name} not found in cache. Downloading...")
+
+            # Load transformers model and processor (will download if needed)
             model, processor = self._get_model(model_name)
 
             # Load audio file
+            report_progress(35, 'Loading audio file...', 'loading_audio')
             print(f"Transcribing with Parakeet {model_name}...")
             import librosa
             import torch
             audio, sr = librosa.load(audio_path, sr=16000)
 
             # Process audio with the processor
+            report_progress(50, 'Transcribing audio...', 'transcribing')
             inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
 
             # Run inference
@@ -109,6 +148,8 @@ class ParakeetBackend(STTBackend):
             transcription = processor.batch_decode(predicted_ids)[0]
 
             processing_time = time.time() - start_time
+
+            report_progress(90, 'Processing results...', 'finalizing')
 
             return {
                 'text': transcription.strip(),

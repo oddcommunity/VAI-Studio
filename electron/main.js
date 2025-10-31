@@ -1,10 +1,13 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const ElectronStore = require('electron-store');
 
+const store = new ElectronStore.default();
 let mainWindow;
 let autoUpdater;
+let authWindow = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -121,12 +124,30 @@ app.on('window-all-closed', function () {
 // Helper to run Python backend commands
 function runPythonCommand(args) {
   return new Promise((resolve, reject) => {
-    // Use venv Python if in Docker, otherwise local venv Python
-    const pythonPath = process.env.DOCKER_ENV === 'true'
-      ? '/app/venv/bin/python'
-      : path.join(__dirname, '../backends/venv/bin/python3');
-    const scriptPath = path.join(__dirname, '../backends/runner.py');
     const os = require('os');
+
+    // Determine Python path based on environment
+    let pythonPath;
+    let scriptPath;
+
+    if (process.env.DOCKER_ENV === 'true') {
+      // Docker environment
+      pythonPath = '/app/venv/bin/python';
+      scriptPath = '/app/backends/runner.py';
+    } else if (app.isPackaged) {
+      // Production (packaged app) - use bundled Python from extraResources
+      const platform = process.platform;
+      const pythonExecutable = platform === 'win32' ? 'python.exe' : 'python3';
+      pythonPath = path.join(process.resourcesPath, 'backends', 'venv', 'bin', pythonExecutable);
+      scriptPath = path.join(process.resourcesPath, 'backends', 'runner.py');
+      console.log('[Python] Using bundled Python:', pythonPath);
+      console.log('[Python] Using bundled scripts:', scriptPath);
+    } else {
+      // Development - use local venv
+      pythonPath = path.join(__dirname, '../backends/venv/bin/python3');
+      scriptPath = path.join(__dirname, '../backends/runner.py');
+      console.log('[Python] Using development Python:', pythonPath);
+    }
 
     // Add ffmpeg to PATH for audio processing
     const homeDir = os.homedir();
@@ -147,8 +168,26 @@ function runPythonCommand(args) {
     });
 
     pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-      console.log('[Python stderr]:', data.toString());
+      const output = data.toString();
+      stderr += output;
+      console.log('[Python stderr]:', output);
+
+      // Parse progress messages
+      const lines = output.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('PROGRESS:')) {
+          try {
+            const progressData = JSON.parse(line.substring(9));
+            console.log('[Progress]:', progressData);
+            // Send progress to renderer
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('transcription-progress', progressData);
+            }
+          } catch (e) {
+            console.error('[Progress] Failed to parse:', e.message);
+          }
+        }
+      }
     });
 
     pythonProcess.on('close', (code) => {
@@ -400,6 +439,152 @@ function formatVTTTime(seconds) {
 }
 
 console.log('Electron main process ready');
+
+// ========================================
+// HUGGINGFACE OAUTH AUTHENTICATION
+// ========================================
+
+// HuggingFace OAuth - Manual Token Entry (Simple approach for MVP)
+// Note: Full OAuth requires backend server for client_secret security
+ipcMain.handle('save-hf-token', async (event, token) => {
+  try {
+    // Store token in electron-store
+    store.set('huggingface_token', token);
+
+    // Also write to HuggingFace cache location for Python to use
+    const os = require('os');
+    const hfCacheDir = path.join(os.homedir(), '.cache', 'huggingface');
+    const tokenPath = path.join(hfCacheDir, 'token');
+
+    // Create cache directory if it doesn't exist
+    if (!fs.existsSync(hfCacheDir)) {
+      fs.mkdirSync(hfCacheDir, { recursive: true });
+    }
+
+    // Write token file
+    fs.writeFileSync(tokenPath, token, 'utf8');
+
+    console.log('[HuggingFace] Token saved successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('[HuggingFace] Error saving token:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get stored HuggingFace token
+ipcMain.handle('get-hf-token', async () => {
+  try {
+    const token = store.get('huggingface_token', '');
+    return { success: true, token };
+  } catch (error) {
+    console.error('[HuggingFace] Error getting token:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear HuggingFace token (logout)
+ipcMain.handle('clear-hf-token', async () => {
+  try {
+    // Remove from electron-store
+    store.delete('huggingface_token');
+
+    // Remove token file
+    const os = require('os');
+    const tokenPath = path.join(os.homedir(), '.cache', 'huggingface', 'token');
+
+    if (fs.existsSync(tokenPath)) {
+      fs.unlinkSync(tokenPath);
+    }
+
+    console.log('[HuggingFace] Token cleared successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('[HuggingFace] Error clearing token:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Open HuggingFace token page in browser
+ipcMain.handle('open-hf-token-page', async () => {
+  try {
+    await shell.openExternal('https://huggingface.co/settings/tokens');
+    return { success: true };
+  } catch (error) {
+    console.error('[HuggingFace] Error opening token page:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Test HuggingFace token validity
+ipcMain.handle('test-hf-token', async (event, token) => {
+  try {
+    // Test the token by making a simple API request
+    const https = require('https');
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: 'huggingface.co',
+        path: '/api/whoami-v2',
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const userData = JSON.parse(data);
+              resolve({
+                success: true,
+                valid: true,
+                username: userData.name || 'Unknown'
+              });
+            } catch (e) {
+              resolve({ success: true, valid: true });
+            }
+          } else {
+            resolve({
+              success: true,
+              valid: false,
+              error: 'Invalid token or unauthorized'
+            });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        resolve({
+          success: false,
+          error: error.message
+        });
+      });
+
+      req.setTimeout(5000, () => {
+        req.destroy();
+        resolve({
+          success: false,
+          error: 'Request timeout'
+        });
+      });
+
+      req.end();
+    });
+  } catch (error) {
+    console.error('[HuggingFace] Error testing token:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+console.log('[HuggingFace] Authentication system initialized');
 
 // ========================================
 // AUTO-UPDATE SYSTEM

@@ -1,16 +1,17 @@
-# LocalVoice AI - Build & Distribution Guide
+# VAI Studio - Build & Distribution Guide
 
-This guide covers building, packaging, and distributing LocalVoice AI for developers.
+This guide covers building, packaging, and distributing VAI Studio for developers.
 
 ## Table of Contents
 
 1. [Development Setup](#development-setup)
 2. [Project Structure](#project-structure)
-3. [Building for Distribution](#building-for-distribution)
-4. [Platform-Specific Builds](#platform-specific-builds)
-5. [Testing Builds](#testing-builds)
-6. [Release Process](#release-process)
-7. [Troubleshooting Build Issues](#troubleshooting-build-issues)
+3. [Python Bundling System](#python-bundling-system)
+4. [Building for Distribution](#building-for-distribution)
+5. [Platform-Specific Builds](#platform-specific-builds)
+6. [Testing Builds](#testing-builds)
+7. [Release Process](#release-process)
+8. [Troubleshooting Build Issues](#troubleshooting-build-issues)
 
 ---
 
@@ -112,6 +113,109 @@ localvoice-ai/
 
 ---
 
+## Python Bundling System
+
+VAI Studio includes an automated Python bundling system that packages Python and all dependencies for distribution. This ensures users don't need to install Python separately.
+
+### How It Works
+
+The build process uses a pre-build script (`scripts/prepare-python-bundle.sh`) that:
+
+1. Creates a clean `backends-bundle/` directory
+2. Copies all Python backend scripts
+3. Creates a fresh virtual environment with all dependencies
+4. Installs packages from `backends/requirements.txt`
+5. Removes unnecessary files to reduce bundle size:
+   - `__pycache__` directories
+   - `.pyc` and `.pyo` compiled files
+   - `.dist-info` directories
+   - `tests` and `test` directories
+
+### Automatic Execution
+
+The bundling script runs automatically before every build:
+
+```bash
+# These commands automatically run the bundling script first:
+npm run build          # Runs prebuild, then builds
+npm run build:mac      # Runs prebuild, then builds for macOS
+npm run build:win      # Runs prebuild, then builds for Windows
+npm run build:linux    # Runs prebuild, then builds for Linux
+```
+
+### Manual Bundling
+
+To manually create the Python bundle (useful for testing):
+
+```bash
+npm run prebuild
+```
+
+This creates `backends-bundle/` with a complete, standalone Python environment.
+
+### Environment Detection
+
+The application automatically detects its environment and uses the appropriate Python:
+
+- **Development** (`npm start`): Uses `backends/venv/bin/python3`
+- **Production** (packaged app): Uses bundled Python from `process.resourcesPath/backends/venv/bin/python3`
+- **Docker** (optional): Uses `/app/venv/bin/python`
+
+This is handled automatically in `electron/main.js`:
+
+```javascript
+if (app.isPackaged) {
+  // Production - use bundled Python
+  pythonPath = path.join(process.resourcesPath, 'backends', 'venv', 'bin', 'python3');
+} else {
+  // Development - use local venv
+  pythonPath = path.join(__dirname, '../backends/venv/bin/python3');
+}
+```
+
+### Bundle Size Optimization
+
+The bundling script already optimizes size by removing:
+- Test files and directories
+- Cached Python bytecode
+- Package metadata (.dist-info)
+
+Typical bundle sizes:
+- Base installation (Whisper only): ~500MB - 800MB
+- With additional backends: ~1GB - 2GB
+
+To further reduce size:
+- Models are downloaded separately (not included in bundle)
+- Only essential Python packages are included
+- Binary libraries are platform-specific
+
+### Troubleshooting Python Bundle
+
+**Problem**: "Python executable not found" in production
+
+**Solution**: Verify the bundle was created:
+```bash
+ls -la backends-bundle/venv/bin/
+```
+
+**Problem**: "ModuleNotFoundError" for Python dependencies
+
+**Solution**: Rebuild the bundle and check requirements.txt:
+```bash
+npm run prebuild
+cd backends-bundle/venv && source bin/activate && pip list
+```
+
+**Problem**: Bundle creation fails
+
+**Solution**: Ensure Python 3.9+ is installed and accessible:
+```bash
+python3 --version
+which python3
+```
+
+---
+
 ## Building for Distribution
 
 ### Build Configuration
@@ -121,8 +225,8 @@ Build settings are defined in `package.json` under the `build` key:
 ```json
 {
   "build": {
-    "appId": "com.localvoiceai.app",
-    "productName": "LocalVoice AI",
+    "appId": "com.vaistudio.app",
+    "productName": "VAI Studio",
     "directories": {
       "output": "dist"
     },
@@ -136,9 +240,14 @@ Build settings are defined in `package.json` under the `build` key:
     ],
     "extraResources": [
       {
-        "from": "backends",
+        "from": "backends-bundle",
         "to": "backends",
-        "filter": ["**/*.py", "!__pycache__", "!*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__",
+          "!**/*.pyc",
+          "!**/*.pyo"
+        ]
       }
     ]
   }
@@ -163,13 +272,13 @@ Built applications appear in `dist/` directory:
 ```
 dist/
 ├── mac/
-│   ├── LocalVoice AI.app
-│   └── LocalVoice AI.dmg
+│   ├── VAI Studio.app
+│   └── VAI Studio.dmg
 ├── win-unpacked/
-│   └── LocalVoice AI.exe
-├── LocalVoice AI Setup.exe
+│   └── VAI Studio.exe
+├── VAI Studio Setup.exe
 ├── linux-unpacked/
-└── LocalVoice-AI-x.y.z.AppImage
+└── VAI-Studio-x.y.z.AppImage
 ```
 
 ---
@@ -183,9 +292,9 @@ npm run build:mac
 ```
 
 **Output**:
-- `dist/mac/LocalVoice AI.app` - Application bundle
-- `dist/LocalVoice AI-{version}.dmg` - Disk image installer
-- `dist/LocalVoice AI-{version}-mac.zip` - Zipped app
+- `dist/mac/VAI Studio.app` - Application bundle
+- `dist/VAI Studio-{version}.dmg` - Disk image installer
+- `dist/VAI Studio-{version}-mac.zip` - Zipped app
 
 **Requirements**:
 - Must build on macOS
@@ -223,8 +332,8 @@ npm run build:win
 ```
 
 **Output**:
-- `dist/LocalVoice AI Setup {version}.exe` - NSIS installer
-- `dist/LocalVoice AI {version}.exe` - Portable executable
+- `dist/VAI Studio Setup {version}.exe` - NSIS installer
+- `dist/VAI Studio {version}.exe` - Portable executable
 
 **Requirements**:
 - Can build on any platform with `wine` (for NSIS)
@@ -265,9 +374,9 @@ npm run build:linux
 ```
 
 **Output**:
-- `dist/LocalVoice-AI-{version}.AppImage` - Universal Linux package
-- `dist/localvoice-ai_{version}_amd64.deb` - Debian/Ubuntu
-- `dist/localvoice-ai-{version}.x86_64.rpm` - Fedora/RHEL
+- `dist/VAI-Studio-{version}.AppImage` - Universal Linux package
+- `dist/vai-studio_{version}_amd64.deb` - Debian/Ubuntu
+- `dist/vai-studio-{version}.x86_64.rpm` - Fedora/RHEL
 
 **Requirements**:
 - Build on Linux for best results
@@ -385,10 +494,10 @@ Follow [Semantic Versioning](https://semver.org/):
    - Select tag version
    - Add release notes
    - Upload platform binaries:
-     - `LocalVoice-AI-{version}.dmg`
-     - `LocalVoice-AI-Setup-{version}.exe`
-     - `LocalVoice-AI-{version}.AppImage`
-     - `localvoice-ai_{version}_amd64.deb`
+     - `VAI-Studio-{version}.dmg`
+     - `VAI-Studio-Setup-{version}.exe`
+     - `VAI-Studio-{version}.AppImage`
+     - `vai-studio_{version}_amd64.deb`
    - Publish release
 
 5. **Update Auto-Update Server** (if configured):
@@ -545,7 +654,7 @@ Configure in `package.json`:
     "publish": {
       "provider": "github",
       "owner": "yourusername",
-      "repo": "localvoice-ai"
+      "repo": "vai-studio"
     }
   }
 }

@@ -8,6 +8,7 @@ import os
 import sys
 from typing import Dict, List
 from base import STTBackend, ModelInfo
+from progress import report_progress
 
 
 class WhisperBackend(STTBackend):
@@ -26,6 +27,7 @@ class WhisperBackend(STTBackend):
         'large-v1': ModelInfo('large-v1', '1.5GB', '1.5B', '~5%', ['transcription', 'translation'], 'OpenAI'),
         'large-v2': ModelInfo('large-v2', '1.5GB', '1.5B', '~5%', ['transcription', 'translation'], 'OpenAI'),
         'large-v3': ModelInfo('large-v3', '1.5GB', '1.5B', '5-8%', ['transcription', 'translation'], 'OpenAI'),
+        'large-v3-quantized-w4a16': ModelInfo('large-v3-quantized-w4a16', '~400MB', '1.5B', '5-8%', ['transcription', 'translation', 'quantized'], 'RedHat AI'),
         'turbo': ModelInfo('turbo', '809MB', '809M', '10-12%', ['transcription', 'translation'], 'OpenAI'),
     }
 
@@ -83,9 +85,48 @@ class WhisperBackend(STTBackend):
     def _get_model(self, model_name: str):
         """Load or return cached model."""
         if self._current_model_name != model_name:
-            whisper = self._load_whisper()
-            print(f"[INFO] Loading Whisper model: {model_name}...", file=sys.stderr)
-            self._current_model = whisper.load_model(model_name)
+            # Check if this is the RedHat quantized model
+            if model_name == 'large-v3-quantized-w4a16':
+                print(f"[INFO] Loading RedHat quantized Whisper model: {model_name}...", file=sys.stderr)
+
+                # Check if model needs to be downloaded
+                is_downloading = not self.is_model_installed(model_name)
+                if is_downloading:
+                    report_progress(15, f'Downloading quantized model {model_name}...', 'downloading')
+
+                try:
+                    from transformers import pipeline
+
+                    # Get HuggingFace token for authentication
+                    token = self._get_hf_token()
+
+                    self._current_model = pipeline(
+                        "automatic-speech-recognition",
+                        model="RedHatAI/whisper-large-v3-quantized.w4a16",
+                        device=-1,  # CPU by default
+                        token=token
+                    )
+
+                    if is_downloading:
+                        report_progress(30, 'Download complete! Model loaded.', 'loaded')
+
+                except ImportError as e:
+                    # Re-raise with original error message to help with debugging
+                    raise ImportError(f"Failed to load quantized model: {str(e)}")
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    # Check for authentication errors
+                    if '401' in error_msg or '403' in error_msg or 'authentication' in error_msg or 'unauthorized' in error_msg:
+                        print(f"Error loading quantized Whisper model {model_name}: Authentication failed")
+                        raise Exception(
+                            "HuggingFace authentication required. Please add your HuggingFace token in Settings > Advanced Settings > HuggingFace Authentication. "
+                            "Get a free token at https://huggingface.co/settings/tokens"
+                        )
+                    raise
+            else:
+                whisper = self._load_whisper()
+                print(f"[INFO] Loading Whisper model: {model_name}...", file=sys.stderr)
+                self._current_model = whisper.load_model(model_name)
             self._current_model_name = model_name
         return self._current_model
 
@@ -104,14 +145,34 @@ class WhisperBackend(STTBackend):
         start_time = time.time()
 
         try:
+            # Report initial progress
+            report_progress(0, 'Starting transcription...', 'initializing')
+
+            # Check if model needs to be downloaded (works for ALL models)
+            if not self.is_model_installed(model_name):
+                model_info = self.MODELS.get(model_name)
+                model_size = model_info.size if model_info else '~1GB'
+                report_progress(5, f'Model not installed. Downloading {model_name} ({model_size})...', 'downloading')
+                print(f"[DOWNLOAD] Model {model_name} not found in cache. Downloading...", file=sys.stderr)
+
             # Load model
+            is_downloading = not self.is_model_installed(model_name)
+            if is_downloading:
+                report_progress(10, f'Downloading {model_name}...', 'downloading')
+            else:
+                report_progress(10, f'Loading {model_name} model...', 'loading_model')
+
             model = self._get_model(model_name)
+
+            if is_downloading:
+                report_progress(28, 'Download complete! Model loaded.', 'loaded')
 
             # Load and convert audio to WAV if needed (M4A not always supported)
             import librosa
             import soundfile as sf
             import tempfile
 
+            report_progress(30, 'Loading audio file...', 'loading_audio')
             print(f"[INFO] Loading audio file: {audio_path}", file=sys.stderr)
             # Load audio with librosa (supports M4A via audioread/ffmpeg)
             audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
@@ -123,19 +184,42 @@ class WhisperBackend(STTBackend):
 
             try:
                 # Transcribe
+                report_progress(50, 'Transcribing audio...', 'transcribing')
                 print(f"[INFO] Transcribing with Whisper {model_name}...", file=sys.stderr)
-                result = model.transcribe(temp_wav_path, **kwargs)
 
-                processing_time = time.time() - start_time
+                # Handle quantized model (transformers pipeline) vs native Whisper
+                if model_name == 'large-v3-quantized-w4a16':
+                    # Transformers pipeline call - enable timestamps for long audio files
+                    result = model(temp_wav_path, return_timestamps=True)
+                    report_progress(90, 'Processing results...', 'finalizing')
+                    processing_time = time.time() - start_time
 
-                return {
-                    'text': result['text'].strip(),
-                    'processing_time': round(processing_time, 2),
-                    'segments': result.get('segments', []),
-                    'language': result.get('language', 'unknown'),
-                    'model': model_name,
-                    'backend': 'whisper'
-                }
+                    # Extract text and segments from result
+                    text = result['text'].strip() if isinstance(result, dict) else str(result).strip()
+                    segments = result.get('chunks', []) if isinstance(result, dict) else []
+
+                    return {
+                        'text': text,
+                        'processing_time': round(processing_time, 2),
+                        'segments': segments,
+                        'language': 'auto',
+                        'model': model_name,
+                        'backend': 'whisper'
+                    }
+                else:
+                    # Native Whisper model call
+                    result = model.transcribe(temp_wav_path, **kwargs)
+                    report_progress(90, 'Processing results...', 'finalizing')
+                    processing_time = time.time() - start_time
+
+                    return {
+                        'text': result['text'].strip(),
+                        'processing_time': round(processing_time, 2),
+                        'segments': result.get('segments', []),
+                        'language': result.get('language', 'unknown'),
+                        'model': model_name,
+                        'backend': 'whisper'
+                    }
             finally:
                 # Clean up temporary file
                 if os.path.exists(temp_wav_path):
@@ -164,7 +248,19 @@ class WhisperBackend(STTBackend):
         """
         Check if a Whisper model is installed.
         Whisper models are stored in ~/.cache/whisper/
+        HuggingFace models (quantized) are stored in ~/.cache/huggingface/hub/
         """
+        # Check for RedHat quantized model in HuggingFace cache
+        if model_name == 'large-v3-quantized-w4a16':
+            hf_cache_dir = os.path.expanduser('~/.cache/huggingface/hub')
+            if not os.path.exists(hf_cache_dir):
+                return False
+            # HuggingFace format: models--RedHatAI--whisper-large-v3-quantized.w4a16
+            model_dir_name = "models--RedHatAI--whisper-large-v3-quantized.w4a16"
+            model_path = os.path.join(hf_cache_dir, model_dir_name)
+            return os.path.exists(model_path)
+
+        # Check for native Whisper models
         cache_dir = os.path.expanduser('~/.cache/whisper')
         if not os.path.exists(cache_dir):
             return False

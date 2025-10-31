@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LocalVoice AI - Speech-to-Text Testing</title>
+  <title>VAI Studio - Speech-to-Text Testing</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <h1>LocalVoice AI</h1>
+      <h1>VAI Studio</h1>
       <p>Test and compare local speech-to-text models</p>
     </header>
 
@@ -24,8 +24,13 @@
             <button id="select-file-btn" class="btn btn-primary">Select Audio File</button>
             <button id="select-multiple-files-btn" class="btn btn-sm" style="margin-top: 0.5rem; width: 100%;">+ Add Multiple Files</button>
             <div id="file-info" class="file-info hidden">
-              <p class="file-name"></p>
-              <p class="file-size"></p>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <p class="file-name"></p>
+                  <p class="file-size"></p>
+                </div>
+                <button id="remove-file-btn" class="btn btn-sm" style="color: #ef4444;">✕ Remove</button>
+              </div>
             </div>
             <div id="batch-queue" class="batch-queue hidden"></div>
           </div>
@@ -40,9 +45,7 @@
 
         <section class="control-section">
           <h2>Model</h2>
-          <select id="model-select" class="select-input">
-            <option value="">Select a model</option>
-          </select>
+          <div id="model-select-container"></div>
           <div id="model-info" class="model-info hidden">
             <span class="model-size"></span>
             <span class="model-wer"></span>
@@ -56,12 +59,8 @@
             <span>Compare multiple models</span>
           </label>
           <div id="comparison-options" class="hidden">
-            <select id="model-select-2" class="select-input">
-              <option value="">Select second model</option>
-            </select>
-            <select id="model-select-3" class="select-input">
-              <option value="">Select third model (optional)</option>
-            </select>
+            <div id="model-select-2-container"></div>
+            <div id="model-select-3-container"></div>
           </div>
         </section>
 
@@ -93,21 +92,16 @@
       <button id="model-manager-btn" class="btn btn-sm btn-primary">📦 Manage Models</button>
     </section>
 
-    <!-- Benchmark Section -->
-    <section class="control-section">
-      <h2>Benchmark</h2>
-      <button id="benchmark-btn" class="btn btn-sm btn-primary">📊 Run Benchmark</button>
-    </section>
   </aside>
 
 
       <!-- Right Panel: Results -->
       <div class="results-panel">
         <div id="welcome-screen" class="welcome-screen">
-          <h2>Welcome to LocalVoice AI</h2>
+          <h2>Welcome to VAI Studio</h2>
           <p>Select an audio file and model to begin transcription</p>
           <ul class="features-list">
-            <li>Test multiple STT models locally</li>
+            <li>Test multiple Speech-To-Text models locally</li>
             <li>Compare results side-by-side</li>
             <li>View processing time and metrics</li>
             <li>No cloud required - 100% local</li>
@@ -122,6 +116,12 @@
           <div class="spinner"></div>
           <p class="loading-text">Processing audio...</p>
           <p class="loading-details"></p>
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div id="loading-progress-fill" class="progress-fill"></div>
+            </div>
+            <span id="loading-progress-text" class="progress-text">0%</span>
+          </div>
         </div>
       </div>
     </main>
@@ -180,8 +180,34 @@
       
       <div class="modal-body">
         <div class="settings-section">
+          <h3>HuggingFace Authentication</h3>
+          <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">
+            Required for downloading Granite, Voxtral, Parakeet, and Wav2Vec models. Whisper models don't require authentication.
+          </p>
+
+          <div id="hf-status" style="padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 1rem; display: none;">
+            <p id="hf-status-text" style="margin: 0; font-size: 0.875rem;"></p>
+          </div>
+
+          <label class="settings-label">
+            Access Token
+            <input type="password" id="hf-token-input" class="select-input" placeholder="hf_...">
+          </label>
+
+          <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem; margin-bottom: 1rem;">
+            Get your free token at: <a href="#" id="hf-token-link" style="color: #3b82f6; text-decoration: underline;">huggingface.co/settings/tokens</a>
+          </p>
+
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="test-hf-token-btn" class="btn btn-sm">Test Token</button>
+            <button id="save-hf-token-btn" class="btn btn-sm btn-success">Save Token</button>
+            <button id="clear-hf-token-btn" class="btn btn-sm" style="color: #ef4444;">Clear Token</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
           <h3>Performance</h3>
-          
+
           <label class="settings-label">
             Device Preference
             <select id="device-preference" class="select-input">
@@ -190,7 +216,7 @@
               <option value="cuda">CUDA (NVIDIA GPU)</option>
             </select>
           </label>
-          
+
           <label class="settings-label">
             Quantization
             <select id="quantization" class="select-input">
@@ -201,7 +227,7 @@
             </select>
           </label>
         </div>
-        
+
         <div class="settings-section">
           <h3>Transcription</h3>
           
@@ -280,51 +306,13 @@
     </div>
   </div>
 
-  <!-- Benchmark Modal -->
-  <div id="benchmark-modal" class="modal hidden">
-    <div class="modal-content" style="max-width: 900px;">
-      <div class="modal-header">
-        <h2>Benchmark Suite</h2>
-        <button id="close-benchmark" class="modal-close">×</button>
-      </div>
-
-      <div class="modal-body">
-        <div class="benchmark-intro">
-          <p>Test model accuracy and performance with built-in test samples.</p>
-        </div>
-
-        <div class="benchmark-settings" style="margin-top: 1.5rem;">
-          <h3>Select Model to Benchmark</h3>
-          <select id="benchmark-backend-select" class="select-input">
-            <option value="">Select backend...</option>
-          </select>
-          <select id="benchmark-model-select" class="select-input" disabled>
-            <option value="">Select model...</option>
-          </select>
-        </div>
-
-        <div class="benchmark-samples" style="margin-top: 1.5rem;">
-          <h3>Test Samples</h3>
-          <div id="benchmark-samples-list"></div>
-        </div>
-
-        <div id="benchmark-results" class="benchmark-results hidden" style="margin-top: 1.5rem;">
-          <h3>Benchmark Results</h3>
-          <div id="benchmark-results-content"></div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button id="run-benchmark" class="btn btn-success" disabled>Run Benchmark</button>
-        <button id="close-benchmark-footer" class="btn">Close</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- Enhanced Model Selector Component -->
+  <link rel="stylesheet" href="components/ModelSelector.css">
+  <script src="components/ModelSelector.js"></script>
+
   <script src="app.js"></script>
-  <script src="benchmark.js"></script>
 </body>
 </html>
