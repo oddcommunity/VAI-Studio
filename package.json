@@ -27,7 +27,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/vai-studio"
+    "url": "https://github.com/oddcommunity/VAI-Studio"
   },
   "build": {
     "appId": "com.vaistudio.app",
@@ -35,6 +35,10 @@
     "directories": {
       "output": "dist"
     },
+    "asarUnpack": [
+      "**/*.node",
+      "backends-bundle/**/*"
+    ],
     "files": [
       "electron/**/*",
       "src/**/*",
@@ -66,14 +70,29 @@
         "zip"
       ],
       "icon": "assets/icon.icns",
-      "darkModeSupport": true
+      "darkModeSupport": true,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "type": "distribution",
+      "identity": "Developer ID Application: Henry Love (6L989H4F6A)",
+      "notarize": {
+        "teamId": "6L989H4F6A"
+      }
     },
     "win": {
       "target": [
         "nsis",
         "portable"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "certificateFile": null,
+      "certificatePassword": null,
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "signDlls": true
     },
     "linux": {
       "target": [
@@ -92,8 +111,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "yourusername",
-      "repo": "vai-studio"
+      "owner": "oddcommunity",
+      "repo": "VAI-Studio"
     }
   },
   "dependencies": {

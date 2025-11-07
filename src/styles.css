@@ -43,6 +43,9 @@ body {
   padding: 1.5rem 2rem;
   border-bottom: 1px solid var(--border-color);
   box-shadow: var(--shadow);
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .app-header h1 {
@@ -1525,4 +1528,236 @@ a:hover {
 
 .wer-poor {
   color: var(--error-color) !important;
+}
+
+/* Utility Classes (replacing inline styles) */
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-gap-2 {
+  display: flex;
+  gap: 2rem;
+}
+
+.margin-top-05 {
+  margin-top: 0.5rem;
+}
+
+.margin-top-1 {
+  margin-top: 1rem;
+}
+
+.margin-top-15 {
+  margin-top: 1.5rem;
+}
+
+.margin-bottom-05 {
+  margin-bottom: 0.5rem;
+}
+
+.margin-bottom-1 {
+  margin-bottom: 1rem;
+}
+
+.width-full {
+  width: 100%;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-2xl {
+  font-size: 2rem;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-italic {
+  font-style: italic;
+}
+
+.color-muted {
+  color: var(--text-muted);
+}
+
+.color-primary {
+  color: var(--text-primary);
+}
+
+.color-success {
+  color: var(--success-color);
+}
+
+.color-error {
+  color: var(--error-color);
+}
+
+.color-link {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.padding-sm {
+  padding: 0.25rem 0.5rem;
+}
+
+.padding-075 {
+  padding: 0.75rem;
+}
+
+.bg-secondary-rounded {
+  background-color: var(--bg-secondary);
+  border-radius: 0.25rem;
+}
+
+.bg-secondary-rounded-mb {
+  background-color: var(--bg-secondary);
+  border-radius: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.border-left-error {
+  border-left: 3px solid var(--error-color);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.max-width-900 {
+  max-width: 900px;
+}
+
+.batch-queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.batch-queue-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.batch-stats-container {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.batch-stat-card {
+  text-align: center;
+}
+
+.batch-stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.batch-stat-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.hf-status-box {
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+.hf-button-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.benchmark-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 1rem;
+}
+
+.benchmark-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
+.benchmark-result-box {
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.benchmark-result-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.benchmark-result-details {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.benchmark-error-box {
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: 0.25rem;
+  margin-bottom: 0.75rem;
+  border-left: 3px solid var(--error-color);
+}
+
+.benchmark-section-title {
+  margin-bottom: 1rem;
+}
+
+.benchmark-subsection {
+  margin-top: 1.5rem;
+}
+
+.benchmark-subsection-title {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.benchmark-note {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Dynamic width helper for progress bars */
+.dynamic-width {
+  width: var(--dynamic-width, 0%);
+}
+
+/* Dynamic color helpers */
+.dynamic-color {
+  color: var(--dynamic-color, var(--text-primary));
+}
+
+/* Grid layout for batch results */
+.batch-results-grid {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
 }

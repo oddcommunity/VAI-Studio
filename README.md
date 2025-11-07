@@ -6,6 +6,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)
+![API](https://img.shields.io/badge/API-documented-orange.svg)
 
 ---
 
@@ -93,11 +94,17 @@ Click **"Benchmark"** to test model accuracy with built-in test samples and real
 
 ## Documentation
 
+### User Guides
 - **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
 - **[Setup Guide](SETUP_GUIDE.md)** - Complete platform-specific setup
 - **[User Guide](USER_GUIDE.md)** - Full documentation with features, settings, and troubleshooting
 - **[Production Guide](PRODUCTION_READY.md)** - Technical details, testing evidence, deployment
-- **[Build Guide](BUILD.md)** - For developers: building and distributing the app
+
+### Developer Guides
+- **[API Documentation](API.md)** - Complete API reference for developers and integrations
+- **[Build Guide](BUILD.md)** - Building and distributing the app
+- **[Code Signing Guide](CODE_SIGNING.md)** - macOS and Windows code signing setup
+- **[Release Guide](RELEASE.md)** - Step-by-step release process
 
 ---
 
@@ -248,6 +255,54 @@ npm run build:all
 
 ---
 
+## For Developers
+
+### API Documentation
+
+VAI Studio provides a comprehensive API for developers who want to:
+- **Build integrations** with other applications
+- **Add custom STT backends** to support new models
+- **Extend functionality** with plugins or custom features
+- **Automate workflows** using the IPC API
+
+📚 **[Complete API Documentation](API.md)** includes:
+- **IPC API Reference** - All available methods with TypeScript types
+- **Python Backend API** - Command-line interface and progress reporting
+- **Adding Custom Backends** - Step-by-step guide with complete example
+- **Data Structures** - Request/response formats
+- **Practical Examples** - Batch processing, model comparison, custom backends
+- **Security Best Practices** - Token encryption, subprocess isolation, CSP
+
+**Example: Adding a Custom Backend**
+
+```python
+from base import STTBackend
+
+class MyBackend(STTBackend):
+    def transcribe(self, audio_path, model_name, task='transcribe'):
+        # Your implementation here
+        return {
+            'text': 'Transcribed text',
+            'processing_time': 1.23,
+            'language': 'en'
+        }
+```
+
+Register in `runner.py` and it's instantly available in the UI!
+
+### Architecture
+
+```
+Frontend (JS) ↔ IPC ↔ Electron Main ↔ subprocess ↔ Python Backend
+```
+
+- **Frontend**: Clean separation, secure contextBridge
+- **IPC**: Type-safe communication with error handling
+- **Backend**: Plugin system, easy to extend
+- **Security**: Encrypted tokens, subprocess isolation, strict CSP
+
+---
+
 ## Version 3.0 - Production Ready ✅
 
 **Status**: 100% Complete - 96/100 Production Score
@@ -299,14 +354,27 @@ npm run build:all
 
 ## Contributing
 
-Contributions are welcome! Areas for improvement:
+Contributions are welcome! We especially encourage:
 
-- Additional STT backends
+### Adding New Backends
+Want to add support for a new STT model or service?
+
+📚 **[API Documentation](API.md#adding-custom-backends)** has a complete guide with:
+- Base class reference
+- Step-by-step implementation
+- Registration process
+- Full working example
+
+It takes ~30 minutes to add a new backend!
+
+### Other Contributions
 - UI/UX enhancements
 - Performance optimizations
 - Documentation improvements
 - Bug fixes and testing
-- Translations
+- Translations and internationalization
+
+**Before contributing**: Please open an issue to discuss your proposed changes.
 
 ---
 
@@ -370,11 +438,12 @@ Inspired by:
 ## Support
 
 - **Documentation**:
-  - [SETUP_GUIDE.md](SETUP_GUIDE.md) - Complete setup
-  - [USER_GUIDE.md](USER_GUIDE.md) - Full manual
-  - [PRODUCTION_READY.md](PRODUCTION_READY.md) - Technical details
+  - **Users**: [SETUP_GUIDE.md](SETUP_GUIDE.md) | [USER_GUIDE.md](USER_GUIDE.md)
+  - **Developers**: [API.md](API.md) | [BUILD.md](BUILD.md) | [CODE_SIGNING.md](CODE_SIGNING.md)
+  - **Technical**: [PRODUCTION_READY.md](PRODUCTION_READY.md)
 - **Issues**: [GitHub Issues](https://github.com/oddcommunity/localvoiceAI/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/oddcommunity/localvoiceAI/discussions)
+- **API Help**: See [API.md](API.md#troubleshooting) for developer-specific troubleshooting
 
 ---
 

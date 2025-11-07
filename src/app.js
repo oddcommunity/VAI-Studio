@@ -556,9 +556,9 @@ function updateBatchQueue() {
   elements.fileInfo.classList.add('hidden');
 
   elements.batchQueue.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-      <span style="font-size: 0.75rem; color: var(--text-muted);">${state.batchFiles.length} files queued</span>
-      <button id="clear-batch" class="btn btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Clear All</button>
+    <div class="batch-queue-header">
+      <span class="batch-queue-count">${state.batchFiles.length} files queued</span>
+      <button id="clear-batch" class="btn btn-sm text-xs padding-sm">Clear All</button>
     </div>
   `;
 
@@ -701,7 +701,7 @@ async function handleBatchTranscribe() {
 
 // Display batch results
 function displayBatchResults(results) {
-  elements.resultsContainer.innerHTML = '<h2 style="margin-bottom: 1rem; color: var(--text-primary);">Batch Results</h2>';
+  elements.resultsContainer.innerHTML = '<h2 class="margin-bottom-1 color-primary">Batch Results</h2>';
 
   // Summary card
   const successCount = results.filter(r => r.success).length;
@@ -711,18 +711,18 @@ function displayBatchResults(results) {
   summaryCard.className = 'batch-results-summary';
   summaryCard.innerHTML = `
     <h3>Summary</h3>
-    <div style="display: flex; gap: 2rem; margin-top: 1rem;">
-      <div>
-        <div style="font-size: 2rem; font-weight: bold; color: var(--success-color);">${successCount}</div>
-        <div style="font-size: 0.875rem; color: var(--text-muted);">Successful</div>
+    <div class="batch-stats-container">
+      <div class="batch-stat-card">
+        <div class="batch-stat-value color-success">${successCount}</div>
+        <div class="batch-stat-label">Successful</div>
       </div>
-      <div>
-        <div style="font-size: 2rem; font-weight: bold; color: ${failCount > 0 ? 'var(--error-color)' : 'var(--text-muted)'};">${failCount}</div>
-        <div style="font-size: 0.875rem; color: var(--text-muted);">Failed</div>
+      <div class="batch-stat-card">
+        <div class="batch-stat-value ${failCount > 0 ? 'color-error' : 'color-muted'}">${failCount}</div>
+        <div class="batch-stat-label">Failed</div>
       </div>
-      <div>
-        <div style="font-size: 2rem; font-weight: bold; color: var(--text-primary);">${results.length}</div>
-        <div style="font-size: 0.875rem; color: var(--text-muted);">Total</div>
+      <div class="batch-stat-card">
+        <div class="batch-stat-value color-primary">${results.length}</div>
+        <div class="batch-stat-label">Total</div>
       </div>
     </div>
   `;
@@ -730,9 +730,7 @@ function displayBatchResults(results) {
 
   // Individual results
   const resultsGrid = document.createElement('div');
-  resultsGrid.style.marginTop = '1.5rem';
-  resultsGrid.style.display = 'grid';
-  resultsGrid.style.gap = '1rem';
+  resultsGrid.className = 'batch-results-grid';
 
   results.forEach(({ file, backend, model, result, success }) => {
     const card = document.createElement('div');
@@ -1318,17 +1316,28 @@ function updateDownloadsTab() {
     return;
   }
   
-  container.innerHTML = activeDownloads.map(download => `
-    <div class="download-item ${download.status === 'downloading' ? 'active' : ''}" id="${download.id}">
+  container.innerHTML = '';
+  activeDownloads.forEach(download => {
+    const item = document.createElement('div');
+    item.className = `download-item ${download.status === 'downloading' ? 'active' : ''}`;
+    item.id = download.id;
+
+    item.innerHTML = `
       <div class="download-header">
         <span class="download-name">${download.backend} / ${download.modelName}</span>
       </div>
       <div class="download-progress">
-        <div class="download-progress-fill" style="width: ${download.progress}%"></div>
+        <div class="download-progress-fill"></div>
       </div>
       <div class="download-status">${download.status}</div>
-    </div>
-  `).join('');
+    `;
+
+    // Set progress width programmatically
+    const progressFill = item.querySelector('.download-progress-fill');
+    progressFill.style.width = `${download.progress}%`;
+
+    container.appendChild(item);
+  });
 }
 
 function updateDownloadProgress(downloadId, progress, status) {

@@ -152,7 +152,7 @@ class ModelSelector {
 
       html += `
         <div class="model-selector-group" data-backend="${this.escapeHtml(backendKey)}">
-          <div class="model-selector-group-header" data-backend="${this.escapeHtml(backendKey)}" style="cursor: pointer;">
+          <div class="model-selector-group-header cursor-pointer" data-backend="${this.escapeHtml(backendKey)}">
             <span class="group-toggle">${arrowIcon}</span>
             <span class="group-name">${this.escapeHtml(displayName)}</span>
             <span class="group-count">${group.models.length} model${group.models.length !== 1 ? 's' : ''}</span>

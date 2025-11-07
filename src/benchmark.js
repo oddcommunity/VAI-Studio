@@ -107,7 +107,7 @@ function displayBenchmarkSamples() {
   if (!container) return;
 
   if (benchmarkSamples.length === 0) {
-    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:1rem;">No benchmark samples available</p>';
+    container.innerHTML = '<p class="benchmark-empty">No benchmark samples available</p>';
     return;
   }
 
@@ -124,7 +124,7 @@ function displayBenchmarkSamples() {
         </div>
       </div>
       <div class="benchmark-sample-reference">"${sample.reference_text}"</div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
+      <div class="benchmark-meta">
         Audio: ${sample.audio_path}
       </div>
     `;
@@ -154,7 +154,7 @@ async function runBenchmark() {
   if (!resultsContainer || !resultsContent) return;
 
   resultsContainer.classList.remove('hidden');
-  resultsContent.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Running benchmark...</p>';
+  resultsContent.innerHTML = '<p class="benchmark-empty">Running benchmark...</p>';
 
   showToast('Benchmark started...', 'info');
 
@@ -166,7 +166,7 @@ async function runBenchmark() {
 
     // Update progress
     resultsContent.innerHTML = `
-      <p style="text-align:center;color:var(--text-muted);">
+      <p class="benchmark-empty">
         Running benchmark ${i + 1}/${benchmarkSamples.length}...<br>
         <small>Testing: ${sample.name}</small>
       </p>
@@ -244,18 +244,18 @@ function displayBenchmarkResults(results, backend, model) {
     if (r.success) {
       const werClass = getWERClass(r.wer);
       resultsHTML += `
-        <div style="padding:0.75rem;background-color:var(--bg-secondary);border-radius:0.25rem;margin-bottom:0.75rem;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
+        <div class="benchmark-result-box">
+          <div class="benchmark-result-header">
             <strong>${r.sample}</strong>
             <span class="${werClass}">WER: ${r.wer.toFixed(2)}%</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;">
+          <div class="benchmark-result-details">
             <strong>Reference:</strong> "${r.reference}"
           </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;">
+          <div class="benchmark-result-details">
             <strong>Hypothesis:</strong> "${r.hypothesis}"
           </div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">
+          <div class="benchmark-result-details">
             Processing time: ${r.processingTime}s
             ${r.language ? ` | Language: ${r.language}` : ''}
           </div>
@@ -263,12 +263,12 @@ function displayBenchmarkResults(results, backend, model) {
       `;
     } else {
       resultsHTML += `
-        <div style="padding:0.75rem;background-color:var(--bg-secondary);border-radius:0.25rem;margin-bottom:0.75rem;border-left:3px solid var(--danger);">
-          <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
+        <div class="benchmark-error-box">
+          <div class="benchmark-result-header">
             <strong>${r.sample}</strong>
-            <span style="color:var(--danger);">Failed</span>
+            <span class="color-error">Failed</span>
           </div>
-          <div style="font-size:0.75rem;color:var(--danger);">
+          <div class="benchmark-result-details color-error">
             Error: ${r.error}
           </div>
         </div>
@@ -280,7 +280,7 @@ function displayBenchmarkResults(results, backend, model) {
 
   resultsContent.innerHTML = `
     <div class="benchmark-result-card">
-      <h4 style="margin-bottom:1rem;">Model: ${backend} / ${model}</h4>
+      <h4 class="benchmark-section-title">Model: ${backend} / ${model}</h4>
       <div class="benchmark-metrics">
         <div class="benchmark-metric">
           <div class="benchmark-metric-value ${avgWERClass}">${avgWER}%</div>
@@ -295,11 +295,11 @@ function displayBenchmarkResults(results, backend, model) {
           <div class="benchmark-metric-label">Success Rate</div>
         </div>
       </div>
-      <div style="margin-top:1.5rem;">
-        <h5 style="font-size:0.875rem;color:var(--text-muted);margin-bottom:0.75rem;">Individual Results:</h5>
+      <div class="benchmark-subsection">
+        <h5 class="benchmark-subsection-title">Individual Results:</h5>
         ${resultsHTML}
       </div>
-      <p style="margin-top:1rem;font-size:0.875rem;color:var(--text-muted);font-style:italic;">
+      <p class="benchmark-note">
         ✅ Real benchmark using actual transcription and WER calculation
       </p>
     </div>

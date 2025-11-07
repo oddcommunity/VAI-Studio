@@ -59,6 +59,14 @@ find "$BUNDLE_DIR/venv" -type d -name "test" -exec rm -rf {} + 2>/dev/null || tr
 # Deactivate virtual environment
 deactivate
 
+# Fix symlinks for code signing (macOS)
+echo ""
+echo "==================================="
+echo "Fixing symlinks for code signing..."
+echo "==================================="
+"$PROJECT_ROOT/scripts/fix-python-symlinks.sh" "$BUNDLE_DIR/venv"
+
+echo ""
 echo "==================================="
 echo "Bundle preparation complete!"
 echo "Bundle location: $BUNDLE_DIR"

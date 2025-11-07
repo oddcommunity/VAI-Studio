@@ -8,6 +8,7 @@ __pycache__/
 # Build outputs
 dist/
 build/
+backends-bundle/
 *.dmg
 *.exe
 *.AppImage

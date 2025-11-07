@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -9,10 +9,29 @@ let mainWindow;
 let autoUpdater;
 let authWindow = null;
 
+// Initialize crash reporting
+crashReporter.start({
+  productName: 'VAI Studio',
+  companyName: 'VAI Studio',
+  submitURL: '', // Leave empty for local crash reports only
+  uploadToServer: false, // Set to true when you have a crash reporting server
+  ignoreSystemCrashHandler: false,
+  compress: true,
+  extra: {
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch
+  }
+});
+
+console.log('[Crash Reporter] Crash reporting initialized');
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#1e293b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -448,8 +467,15 @@ console.log('Electron main process ready');
 // Note: Full OAuth requires backend server for client_secret security
 ipcMain.handle('save-hf-token', async (event, token) => {
   try {
-    // Store token in electron-store
-    store.set('huggingface_token', token);
+    // Encrypt token using safeStorage before storing
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(token);
+      store.set('huggingface_token', encrypted.toString('base64'));
+    } else {
+      // Fallback for systems where encryption is not available
+      console.warn('[HuggingFace] Encryption not available, storing token in plain text');
+      store.set('huggingface_token', token);
+    }
 
     // Also write to HuggingFace cache location for Python to use
     const os = require('os');
@@ -461,7 +487,7 @@ ipcMain.handle('save-hf-token', async (event, token) => {
       fs.mkdirSync(hfCacheDir, { recursive: true });
     }
 
-    // Write token file
+    // Write token file (Python needs plain text)
     fs.writeFileSync(tokenPath, token, 'utf8');
 
     console.log('[HuggingFace] Token saved successfully');
@@ -475,8 +501,26 @@ ipcMain.handle('save-hf-token', async (event, token) => {
 // Get stored HuggingFace token
 ipcMain.handle('get-hf-token', async () => {
   try {
-    const token = store.get('huggingface_token', '');
-    return { success: true, token };
+    const storedToken = store.get('huggingface_token', '');
+    if (!storedToken) {
+      return { success: true, token: '' };
+    }
+
+    // Decrypt token if encryption is available
+    if (safeStorage.isEncryptionAvailable()) {
+      try {
+        const buffer = Buffer.from(storedToken, 'base64');
+        const token = safeStorage.decryptString(buffer);
+        return { success: true, token };
+      } catch (decryptError) {
+        // If decryption fails, the token might be stored in plain text (old format)
+        console.warn('[HuggingFace] Token decryption failed, returning as-is');
+        return { success: true, token: storedToken };
+      }
+    } else {
+      // Encryption not available, return plain text
+      return { success: true, token: storedToken };
+    }
   } catch (error) {
     console.error('[HuggingFace] Error getting token:', error);
     return { success: false, error: error.message };

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self';">
   <title>VAI Studio - Speech-to-Text Testing</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -22,14 +23,14 @@
           <h2>Audio Input</h2>
           <div class="file-upload">
             <button id="select-file-btn" class="btn btn-primary">Select Audio File</button>
-            <button id="select-multiple-files-btn" class="btn btn-sm" style="margin-top: 0.5rem; width: 100%;">+ Add Multiple Files</button>
+            <button id="select-multiple-files-btn" class="btn btn-sm margin-top-05 width-full">+ Add Multiple Files</button>
             <div id="file-info" class="file-info hidden">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="flex-between">
                 <div>
                   <p class="file-name"></p>
                   <p class="file-size"></p>
                 </div>
-                <button id="remove-file-btn" class="btn btn-sm" style="color: #ef4444;">✕ Remove</button>
+                <button id="remove-file-btn" class="btn btn-sm color-error">✕ Remove</button>
               </div>
             </div>
             <div id="batch-queue" class="batch-queue hidden"></div>
@@ -68,7 +69,7 @@
           <button id="transcribe-btn" class="btn btn-success btn-large" disabled>
             Transcribe
           </button>
-          <button id="transcribe-batch-btn" class="btn btn-success btn-large hidden" style="margin-top: 0.5rem;">
+          <button id="transcribe-batch-btn" class="btn btn-success btn-large hidden margin-top-05">
             Transcribe Batch
           </button>
           <div id="batch-progress" class="batch-progress hidden">
@@ -131,7 +132,7 @@
 
   <!-- Model Manager Modal -->
   <div id="model-manager-modal" class="modal hidden">
-    <div class="modal-content" style="max-width: 900px;">
+    <div class="modal-content max-width-900">
       <div class="modal-header">
         <h2>Model Manager</h2>
         <button id="close-model-manager" class="modal-close">×</button>
@@ -181,12 +182,12 @@
       <div class="modal-body">
         <div class="settings-section">
           <h3>HuggingFace Authentication</h3>
-          <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">
+          <p class="text-sm color-muted margin-bottom-1">
             Required for downloading Granite, Voxtral, Parakeet, and Wav2Vec models. Whisper models don't require authentication.
           </p>
 
-          <div id="hf-status" style="padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 1rem; display: none;">
-            <p id="hf-status-text" style="margin: 0; font-size: 0.875rem;"></p>
+          <div id="hf-status" class="hf-status-box hidden">
+            <p id="hf-status-text" class="text-sm"></p>
           </div>
 
           <label class="settings-label">
@@ -194,14 +195,14 @@
             <input type="password" id="hf-token-input" class="select-input" placeholder="hf_...">
           </label>
 
-          <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem; margin-bottom: 1rem;">
-            Get your free token at: <a href="#" id="hf-token-link" style="color: #3b82f6; text-decoration: underline;">huggingface.co/settings/tokens</a>
+          <p class="text-sm color-muted margin-top-05 margin-bottom-1">
+            Get your free token at: <a href="#" id="hf-token-link" class="color-link">huggingface.co/settings/tokens</a>
           </p>
 
-          <div style="display: flex; gap: 0.5rem;">
+          <div class="hf-button-row">
             <button id="test-hf-token-btn" class="btn btn-sm">Test Token</button>
             <button id="save-hf-token-btn" class="btn btn-sm btn-success">Save Token</button>
-            <button id="clear-hf-token-btn" class="btn btn-sm" style="color: #ef4444;">Clear Token</button>
+            <button id="clear-hf-token-btn" class="btn btn-sm color-error">Clear Token</button>
           </div>
         </div>
 
