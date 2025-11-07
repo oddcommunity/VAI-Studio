@@ -46,6 +46,27 @@ body {
   -webkit-app-region: drag;
   -webkit-user-select: none;
   user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.header-right {
+  -webkit-app-region: no-drag;
+}
+
+.app-version {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-color);
 }
 
 .app-header h1 {

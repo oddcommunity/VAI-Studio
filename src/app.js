@@ -1014,6 +1014,27 @@ function showNotification(message, type = 'info') {
   }
 }
 
+// License event handlers
+const apacheLicenseLink = document.getElementById('apache-license-link');
+const viewLicenseBtn = document.getElementById('view-license-btn');
+
+if (apacheLicenseLink) {
+  apacheLicenseLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.electronAPI.openExternal('https://www.apache.org/licenses/LICENSE-2.0');
+  });
+}
+
+if (viewLicenseBtn) {
+  viewLicenseBtn.addEventListener('click', async () => {
+    try {
+      await window.electronAPI.openLicenseFile();
+    } catch (error) {
+      showToast('Failed to open license file', 'error');
+    }
+  });
+}
+
 // Load settings on init
 loadSettings();
 
