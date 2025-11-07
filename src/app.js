@@ -10,7 +10,10 @@ let state = {
   activeTranscriptions: 0,
   batchMode: false,
   batchFiles: [],
-  batchProcessing: false
+  batchProcessing: false,
+  isRecording: false,
+  recordedAudio: null,
+  audioRecorder: null
 };
 
 // Model Selector Instances
@@ -80,7 +83,14 @@ const elements = {
   batchProgressFill: document.getElementById('batch-progress-fill'),
   welcomeScreen: document.getElementById('welcome-screen'),
   resultsContainer: document.getElementById('results-container'),
-  loadingScreen: document.getElementById('loading-screen')
+  loadingScreen: document.getElementById('loading-screen'),
+  recordAudioBtn: document.getElementById('record-audio-btn'),
+  stopRecordingBtn: document.getElementById('stop-recording-btn'),
+  recordingIndicator: document.getElementById('recording-indicator'),
+  recordingPreview: document.getElementById('recording-preview'),
+  playRecordingBtn: document.getElementById('play-recording-btn'),
+  discardRecordingBtn: document.getElementById('discard-recording-btn'),
+  useRecordingBtn: document.getElementById('use-recording-btn')
 };
 
 // Initialize the app
@@ -349,6 +359,35 @@ function setupEventListeners() {
   });
 
   elements.transcribeBatchBtn.addEventListener('click', handleBatchTranscribe);
+
+  // Voice Recording event listeners
+  // Initialize audio recorder
+  state.audioRecorder = new window.AudioRecorder();
+
+  // Start recording
+  elements.recordAudioBtn.addEventListener('click', async () => {
+    await startRecording();
+  });
+
+  // Stop recording
+  elements.stopRecordingBtn.addEventListener('click', async () => {
+    await stopRecording();
+  });
+
+  // Play recorded audio
+  elements.playRecordingBtn.addEventListener('click', () => {
+    playRecordedAudio();
+  });
+
+  // Discard recording
+  elements.discardRecordingBtn.addEventListener('click', () => {
+    discardRecording();
+  });
+
+  // Use recording for transcription
+  elements.useRecordingBtn.addEventListener('click', async () => {
+    await useRecording();
+  });
 }
 
 // Show file info
@@ -390,7 +429,11 @@ function updateTranscribeButton() {
   const hasModels = state.comparisonMode
     ? hasModel && modelSelector2 && modelSelector2.getValue() !== ''
     : hasModel;
-  elements.transcribeBtn.disabled = !(hasFile && hasModels);
+
+  // Disable transcribe button while recording
+  const notRecording = !state.isRecording;
+
+  elements.transcribeBtn.disabled = !(hasFile && hasModels && notRecording);
 }
 
 // Handle transcription
@@ -1357,5 +1400,169 @@ function removeDownload(downloadId) {
 async function refreshModels() {
   await loadModelLists();
   showNotification('Model list refreshed', 'success');
+}
+
+// ========================================
+// VOICE RECORDING FUNCTIONS
+// ========================================
+
+/**
+ * Start audio recording
+ */
+async function startRecording() {
+  try {
+    // Check if recording is supported
+    if (!state.audioRecorder.isSupported()) {
+      showToast('Audio recording is not supported in this browser', 'error');
+      return;
+    }
+
+    // Start recording with time updates
+    await state.audioRecorder.startRecording((seconds) => {
+      updateRecordingTime(seconds);
+    });
+
+    state.isRecording = true;
+
+    // Update UI
+    elements.recordAudioBtn.classList.add('hidden');
+    elements.recordingIndicator.classList.remove('hidden');
+    elements.recordingPreview.classList.add('hidden');
+    document.body.classList.add('recording-active');
+
+    showToast('Recording started', 'info');
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    showToast(error.message, 'error');
+  }
+}
+
+/**
+ * Stop audio recording
+ */
+async function stopRecording() {
+  try {
+    const result = await state.audioRecorder.stopRecording();
+
+    state.isRecording = false;
+    state.recordedAudio = result;
+
+    // Update UI
+    elements.recordingIndicator.classList.add('hidden');
+    elements.recordAudioBtn.classList.remove('hidden');
+    elements.recordingPreview.classList.remove('hidden');
+    document.body.classList.remove('recording-active');
+
+    // Update preview info
+    const durationText = formatDuration(result.duration);
+    elements.recordingPreview.querySelector('.preview-duration').textContent = durationText;
+
+    showToast('Recording stopped', 'success');
+  } catch (error) {
+    console.error('Error stopping recording:', error);
+    showToast('Failed to stop recording: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Update recording time display
+ */
+function updateRecordingTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeString = `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  const timeElement = elements.recordingIndicator.querySelector('.recording-time');
+  if (timeElement) {
+    timeElement.textContent = timeString;
+  }
+}
+
+/**
+ * Play recorded audio preview
+ */
+function playRecordedAudio() {
+  if (!state.recordedAudio) {
+    showToast('No recorded audio available', 'error');
+    return;
+  }
+
+  try {
+    const audio = state.audioRecorder.createAudioElement();
+    audio.play();
+
+    // Update button text during playback
+    const playBtn = elements.playRecordingBtn;
+    const originalText = playBtn.textContent;
+    playBtn.textContent = '⏸ Playing...';
+    playBtn.disabled = true;
+
+    audio.onended = () => {
+      playBtn.textContent = originalText;
+      playBtn.disabled = false;
+    };
+  } catch (error) {
+    console.error('Error playing audio:', error);
+    showToast('Failed to play audio: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Discard recorded audio
+ */
+function discardRecording() {
+  state.recordedAudio = null;
+  elements.recordingPreview.classList.add('hidden');
+  showToast('Recording discarded', 'info');
+}
+
+/**
+ * Use recording for transcription
+ */
+async function useRecording() {
+  if (!state.recordedAudio) {
+    showToast('No recorded audio available', 'error');
+    return;
+  }
+
+  try {
+    // Save the recorded audio blob to a temporary file
+    const result = await window.electronAPI.saveRecording({
+      blob: state.recordedAudio.blob,
+      mimeType: state.recordedAudio.mimeType,
+      duration: state.recordedAudio.duration
+    });
+
+    if (result.success) {
+      // Set as selected file
+      state.selectedFile = result.filePath;
+      state.recordedAudio.filePath = result.filePath;
+
+      // Update UI to show file info
+      showFileInfo(result.filePath);
+
+      // Hide recording preview
+      elements.recordingPreview.classList.add('hidden');
+
+      // Enable transcribe button
+      updateTranscribeButton();
+
+      showToast('Recording ready for transcription', 'success');
+    } else {
+      showToast('Failed to save recording: ' + result.error, 'error');
+    }
+  } catch (error) {
+    console.error('Error using recording:', error);
+    showToast('Failed to prepare recording: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Format duration in seconds to MM:SS
+ */
+function formatDuration(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
