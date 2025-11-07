@@ -35,6 +35,29 @@
             </div>
             <div id="batch-queue" class="batch-queue hidden"></div>
           </div>
+
+          <!-- Voice Recording Controls -->
+          <div class="recording-controls">
+            <button id="record-audio-btn" class="btn btn-primary width-full">
+              <span class="record-icon">🎤</span> Record Audio
+            </button>
+            <div id="recording-indicator" class="recording-indicator hidden">
+              <div class="recording-pulse"></div>
+              <span class="recording-time">00:00</span>
+              <button id="stop-recording-btn" class="btn btn-sm color-error">Stop Recording</button>
+            </div>
+            <div id="recording-preview" class="recording-preview hidden">
+              <div class="recording-preview-header">
+                <span class="preview-filename">Recorded Audio</span>
+                <span class="preview-duration"></span>
+              </div>
+              <div class="recording-actions">
+                <button id="play-recording-btn" class="btn btn-sm">▶ Play</button>
+                <button id="discard-recording-btn" class="btn btn-sm color-error">✕ Discard</button>
+                <button id="use-recording-btn" class="btn btn-sm btn-success">✓ Use Recording</button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="control-section hidden">
@@ -313,6 +336,9 @@
   <!-- Enhanced Model Selector Component -->
   <link rel="stylesheet" href="components/ModelSelector.css">
   <script src="components/ModelSelector.js"></script>
+
+  <!-- Audio Recorder Module -->
+  <script src="audioRecorder.js"></script>
 
   <script src="app.js"></script>
 </body>

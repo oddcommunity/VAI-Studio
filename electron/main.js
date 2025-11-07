@@ -651,4 +651,67 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
+// ========================================
+// VOICE RECORDING IPC HANDLERS
+// ========================================
+
+// Save recorded audio blob to temporary file
+ipcMain.handle('save-recording', async (event, { blob, mimeType, duration }) => {
+  try {
+    const os = require('os');
+    const crypto = require('crypto');
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = crypto.randomBytes(4).toString('hex');
+
+    // Determine file extension from MIME type
+    let extension = 'webm'; // Default
+    if (mimeType.includes('audio/ogg')) extension = 'ogg';
+    else if (mimeType.includes('audio/mp4')) extension = 'm4a';
+    else if (mimeType.includes('audio/wav')) extension = 'wav';
+    else if (mimeType.includes('audio/webm')) extension = 'webm';
+
+    // Create temporary file path
+    const tempDir = os.tmpdir();
+    const fileName = `vai-recording-${timestamp}-${randomId}.${extension}`;
+    const filePath = path.join(tempDir, fileName);
+
+    // Convert blob data (received as array buffer) to Buffer
+    const buffer = Buffer.from(blob);
+
+    // Write to file
+    fs.writeFileSync(filePath, buffer);
+
+    console.log('[Recording] Saved to:', filePath);
+
+    return {
+      success: true,
+      filePath: filePath,
+      fileName: fileName,
+      duration: duration
+    };
+  } catch (error) {
+    console.error('[Recording] Error saving:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// Cleanup temporary recording file
+ipcMain.handle('cleanup-temp-file', async (event, filePath) => {
+  try {
+    if (fs.existsSync(filePath) && filePath.includes('vai-recording-')) {
+      fs.unlinkSync(filePath);
+      console.log('[Cleanup] Deleted temporary file:', filePath);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('[Cleanup] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 console.log('[Auto-Update] System initialized');

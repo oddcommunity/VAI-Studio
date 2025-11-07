@@ -49,6 +49,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearHFToken: () => ipcRenderer.invoke('clear-hf-token'),
   openHFTokenPage: () => ipcRenderer.invoke('open-hf-token-page'),
   testHFToken: (token) => ipcRenderer.invoke('test-hf-token', token),
+
+  // Voice recording
+  saveRecording: async (recordingData) => {
+    // Convert blob to array buffer for IPC transfer
+    const arrayBuffer = await recordingData.blob.arrayBuffer();
+    return ipcRenderer.invoke('save-recording', {
+      blob: arrayBuffer,
+      mimeType: recordingData.mimeType,
+      duration: recordingData.duration
+    });
+  },
+  cleanupTempFile: (filePath) => ipcRenderer.invoke('cleanup-temp-file', filePath),
 });
 
 console.log('Preload script loaded');
