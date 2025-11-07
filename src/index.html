@@ -11,8 +11,16 @@
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <h1>VAI Studio</h1>
-      <p>Test and compare local speech-to-text models</p>
+      <div class="header-left">
+        <h1>VAI Studio</h1>
+        <p>Test and compare local speech-to-text models</p>
+      </div>
+      <div class="header-right">
+        <div class="version-info">
+          <span id="app-version" class="app-version">v3.0.0</span>
+          <span class="version-date">Nov 7, 2025</span>
+        </div>
+      </div>
     </header>
 
     <!-- Main Content -->
@@ -321,8 +329,25 @@
             </select>
           </label>
         </div>
+
+        <div class="settings-section">
+          <h3>License</h3>
+          <p class="text-sm color-muted margin-bottom-1">
+            VAI Studio is open source software licensed under the Apache License 2.0.
+          </p>
+          <div class="license-info">
+            <p class="text-sm margin-bottom-05">
+              Copyright 2025 VAI Studio Contributors
+            </p>
+            <p class="text-sm color-muted margin-bottom-1">
+              Licensed under the Apache License, Version 2.0. You may obtain a copy of the License at
+              <a href="#" id="apache-license-link" class="color-link">apache.org/licenses/LICENSE-2.0</a>
+            </p>
+            <button id="view-license-btn" class="btn btn-sm">View Full License</button>
+          </div>
+        </div>
       </div>
-      
+
       <div class="modal-footer">
         <button id="reset-settings" class="btn btn-sm">Reset to Defaults</button>
         <button id="save-settings" class="btn btn-success">Save Settings</button>

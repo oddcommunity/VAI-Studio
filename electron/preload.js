@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     });
   },
   cleanupTempFile: (filePath) => ipcRenderer.invoke('cleanup-temp-file', filePath),
+
+  // License and external links
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  openLicenseFile: () => ipcRenderer.invoke('open-license-file'),
 });
 
 console.log('Preload script loaded');

@@ -714,4 +714,27 @@ ipcMain.handle('cleanup-temp-file', async (event, filePath) => {
   }
 });
 
+// Open external URL (for Apache License link)
+ipcMain.handle('open-external', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('[Open External] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Open LICENSE file in default text editor
+ipcMain.handle('open-license-file', async () => {
+  try {
+    const licensePath = path.join(__dirname, '..', 'LICENSE');
+    await shell.openPath(licensePath);
+    return { success: true };
+  } catch (error) {
+    console.error('[Open License] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 console.log('[Auto-Update] System initialized');

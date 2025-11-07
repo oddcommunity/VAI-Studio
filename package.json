@@ -24,7 +24,7 @@
     "transcription-tool"
   ],
   "author": "VAI Studio",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/oddcommunity/VAI-Studio"
