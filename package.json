@@ -76,9 +76,9 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "type": "distribution",
-      "identity": "Developer ID Application: Henry Love (6L989H4F6A)",
+      "identity": "Developer ID Application: YOUR_NAME (YOUR_TEAM_ID)",
       "notarize": {
-        "teamId": "6L989H4F6A"
+        "teamId": "YOUR_TEAM_ID"
       }
     },
     "win": {

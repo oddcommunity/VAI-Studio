@@ -41,6 +41,8 @@ models/
 # Environment
 .env
 .env.local
+.env.signing
+.apple-credentials
 venv/
 venv_local/
 backends/venv/bin/python3
@@ -48,9 +50,19 @@ backends/venv/bin/python3.*
 backends/venv/lib64
 backends/venv/pyvenv.cfg
 
+# Code signing certificates (NEVER commit these!)
+*.pfx
+*.p12
+*.cer
+*.mobileprovision
+certificates/
+
 # Local config changes (don't commit local modifications)
 docker-compose.yml
 FILE_ACCESS_DOCKER.md
+
+# Internal documentation (not for open source)
+docs/archive/
 
 # Temporary files
 tmp/

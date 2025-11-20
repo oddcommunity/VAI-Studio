@@ -1,4 +1,4 @@
-# X11 Forwarding Setup for LocalVoice AI Docker GUI
+# X11 Forwarding Setup for VAI Studio Docker GUI
 
 This guide will help you see the Electron GUI while running in Docker, keeping everything isolated from your other projects.
 
@@ -60,7 +60,7 @@ export DISPLAY=$DISPLAY_IP:0
 echo $DISPLAY
 ```
 
-## Step 4: Run LocalVoice AI with GUI
+## Step 4: Run VAI Studio with GUI
 
 Now run the Docker container with GUI support:
 
@@ -72,7 +72,7 @@ docker-compose down
 docker-compose run --rm \
   -e DISPLAY=$DISPLAY \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
-  localvoice-dev
+  vai-studio-dev
 ```
 
 ## Alternative: Simple Script
@@ -117,12 +117,12 @@ If X11 forwarding doesn't work well, you can run locally but install Python depe
 
 ```bash
 # Create Python virtual environment
-cd /Users/exeai/Projects/localvoiceAI
+cd ~/Projects/VAI-Studio  # Or wherever you cloned the repo
 python3 -m venv venv_local
 source venv_local/bin/activate
 
 # Install Python dependencies
-pip install openai-whisper torch transformers librosa soundfile ffmpeg-python
+pip install -r backends/requirements.txt
 
 # Run the app (uses local Node.js but isolated Python)
 npm run dev

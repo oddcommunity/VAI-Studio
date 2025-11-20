@@ -273,13 +273,8 @@ body {
 .features-list li {
   padding: 0.5rem 0;
   color: var(--text-secondary);
-}
-
-.features-list li::before {
-  content: "✓ ";
-  color: var(--success-color);
-  font-weight: bold;
-  margin-right: 0.5rem;
+  list-style-type: disc;
+  margin-left: 1.5rem;
 }
 
 /* Loading Screen */
@@ -552,7 +547,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   animation: fadeIn 0.2s ease;
 }
 
@@ -563,9 +558,12 @@ body {
   width: 90%;
   max-width: 700px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-  animation: slideUp 0.3s ease;
+  /* animation: slideUp 0.3s ease; */
+  pointer-events: auto !important;
 }
 
 @keyframes slideUp {
@@ -579,6 +577,7 @@ body {
   align-items: center;
   padding: 1.5rem;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -597,6 +596,10 @@ body {
   width: 2rem;
   height: 2rem;
   transition: color 0.15s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-close:hover {
@@ -605,6 +608,9 @@ body {
 
 .modal-body {
   padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {
@@ -612,6 +618,7 @@ body {
   justify-content: space-between;
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 /* Settings Styles */
@@ -1038,6 +1045,52 @@ input[type="checkbox"]:hover:not(:disabled) {
 .skeleton-button {
   height: 2.5rem;
   width: 100%;
+}
+
+/* Update Banner (Linear-style) */
+.update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  z-index: 10001;
+  font-size: 0.875rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.3s ease;
+}
+
+.update-banner.hidden {
+  display: none;
+}
+
+.update-banner span {
+  font-weight: 500;
+}
+
+.update-banner .btn {
+  background-color: white;
+  color: #667eea;
+  border: none;
+  font-weight: 600;
+  padding: 0.4rem 1rem;
+  font-size: 0.813rem;
+}
+
+.update-banner .btn:hover {
+  background-color: #f0f0f0;
+  transform: translateY(0);
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
 }
 
 /* Toast notification system */
@@ -1564,6 +1617,28 @@ a:hover {
   color: var(--error-color) !important;
 }
 
+/* Button Row Layout */
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.btn-recordings {
+  white-space: nowrap;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-recordings:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
 /* Utility Classes (replacing inline styles) */
 .flex-between {
   display: flex;
@@ -1883,12 +1958,20 @@ a:hover {
 }
 
 .recording-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
 }
 
 .recording-actions .btn {
-  flex: 1;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
 }
 
 /* Recording State - Disable other controls during recording */

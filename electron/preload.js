@@ -51,20 +51,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   testHFToken: (token) => ipcRenderer.invoke('test-hf-token', token),
 
   // Voice recording
-  saveRecording: async (recordingData) => {
-    // Convert blob to array buffer for IPC transfer
-    const arrayBuffer = await recordingData.blob.arrayBuffer();
-    return ipcRenderer.invoke('save-recording', {
-      blob: arrayBuffer,
-      mimeType: recordingData.mimeType,
-      duration: recordingData.duration
-    });
+  saveRecording: (recordingData) => {
+    // recordingData.blob is already an ArrayBuffer from app.js
+    return ipcRenderer.invoke('save-recording', recordingData);
   },
   cleanupTempFile: (filePath) => ipcRenderer.invoke('cleanup-temp-file', filePath),
+  showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
+  openRecordingsFolder: () => ipcRenderer.invoke('open-recordings-folder'),
+  selectFromRecordings: () => ipcRenderer.invoke('select-from-recordings'),
 
   // License and external links
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   openLicenseFile: () => ipcRenderer.invoke('open-license-file'),
+
+  // Auto-update (Linear-style)
+  restartToUpdate: () => ipcRenderer.invoke('restart-to-update'),
+  onUpdateReady: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('update-ready', subscription);
+    return () => {
+      ipcRenderer.removeListener('update-ready', subscription);
+    };
+  },
 });
 
 console.log('Preload script loaded');

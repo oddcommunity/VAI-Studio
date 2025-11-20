@@ -13,7 +13,8 @@ let state = {
   batchProcessing: false,
   isRecording: false,
   recordedAudio: null,
-  audioRecorder: null
+  audioRecorder: null,
+  currentAudioPlayer: null // Keep reference to audio element during playback
 };
 
 // Model Selector Instances
@@ -64,38 +65,46 @@ function showToast(message, type = 'info', duration = 3000) {
   }
 }
 
-// DOM Elements
-const elements = {
-  selectFileBtn: document.getElementById('select-file-btn'),
-  selectMultipleFilesBtn: document.getElementById('select-multiple-files-btn'),
-  removeFileBtn: document.getElementById('remove-file-btn'),
-  fileInfo: document.getElementById('file-info'),
-  batchQueue: document.getElementById('batch-queue'),
-  backendSelect: document.getElementById('backend-select'),
-  modelInfo: document.getElementById('model-info'),
-  comparisonMode: document.getElementById('comparison-mode'),
-  comparisonOptions: document.getElementById('comparison-options'),
-  transcribeBtn: document.getElementById('transcribe-btn'),
-  transcribeBatchBtn: document.getElementById('transcribe-batch-btn'),
-  batchProgress: document.getElementById('batch-progress'),
-  batchCurrent: document.getElementById('batch-current'),
-  batchTotal: document.getElementById('batch-total'),
-  batchProgressFill: document.getElementById('batch-progress-fill'),
-  welcomeScreen: document.getElementById('welcome-screen'),
-  resultsContainer: document.getElementById('results-container'),
-  loadingScreen: document.getElementById('loading-screen'),
-  recordAudioBtn: document.getElementById('record-audio-btn'),
-  stopRecordingBtn: document.getElementById('stop-recording-btn'),
-  recordingIndicator: document.getElementById('recording-indicator'),
-  recordingPreview: document.getElementById('recording-preview'),
-  playRecordingBtn: document.getElementById('play-recording-btn'),
-  discardRecordingBtn: document.getElementById('discard-recording-btn'),
-  useRecordingBtn: document.getElementById('use-recording-btn')
-};
+// DOM Elements - will be initialized after DOM loads
+let elements = {};
+
+// Initialize DOM element references
+function initElements() {
+  elements = {
+    selectFileBtn: document.getElementById('select-file-btn'),
+    viewRecordingsFolderBtn: document.getElementById('view-recordings-folder-btn'),
+    selectMultipleFilesBtn: document.getElementById('select-multiple-files-btn'),
+    removeFileBtn: document.getElementById('remove-file-btn'),
+    fileInfo: document.getElementById('file-info'),
+    batchQueue: document.getElementById('batch-queue'),
+    backendSelect: document.getElementById('backend-select'),
+    modelInfo: document.getElementById('model-info'),
+    comparisonMode: document.getElementById('comparison-mode'),
+    comparisonOptions: document.getElementById('comparison-options'),
+    transcribeBtn: document.getElementById('transcribe-btn'),
+    transcribeBatchBtn: document.getElementById('transcribe-batch-btn'),
+    batchProgress: document.getElementById('batch-progress'),
+    batchCurrent: document.getElementById('batch-current'),
+    batchTotal: document.getElementById('batch-total'),
+    batchProgressFill: document.getElementById('batch-progress-fill'),
+    welcomeScreen: document.getElementById('welcome-screen'),
+    resultsContainer: document.getElementById('results-container'),
+    loadingScreen: document.getElementById('loading-screen'),
+    recordAudioBtn: document.getElementById('record-audio-btn'),
+    stopRecordingBtn: document.getElementById('stop-recording-btn'),
+    recordingIndicator: document.getElementById('recording-indicator'),
+    recordingPreview: document.getElementById('recording-preview'),
+    playRecordingBtn: document.getElementById('play-recording-btn'),
+    openRecordingFolderBtn: document.getElementById('open-recording-folder-btn'),
+    discardRecordingBtn: document.getElementById('discard-recording-btn'),
+    useRecordingBtn: document.getElementById('use-recording-btn')
+  };
+}
 
 // Initialize the app
 async function init() {
   console.log('Initializing LocalVoice AI...');
+  initElements();
   await loadBackends();
   setupEventListeners();
   setupProgressListener();
@@ -283,6 +292,15 @@ function setupEventListeners() {
     }
   });
 
+  // Select from recorded audio files
+  elements.viewRecordingsFolderBtn.addEventListener('click', async () => {
+    const result = await window.electronAPI.selectFromRecordings();
+    if (result.success && !result.canceled) {
+      // Load the selected recording into the preview
+      loadRecordedFile(result.filePath, result.fileName, result.duration);
+    }
+  });
+
   // Remove selected file
   elements.removeFileBtn.addEventListener('click', () => {
     state.selectedFile = null;
@@ -377,6 +395,11 @@ function setupEventListeners() {
   // Play recorded audio
   elements.playRecordingBtn.addEventListener('click', () => {
     playRecordedAudio();
+  });
+
+  // Open recording folder
+  elements.openRecordingFolderBtn.addEventListener('click', () => {
+    openRecordingFolder();
   });
 
   // Discard recording
@@ -925,39 +948,53 @@ function applySettings() {
   });
 }
 
-// Settings Modal Management
-const settingsModal = document.getElementById('settings-modal');
-const settingsBtn = document.getElementById('settings-btn');
-const closeSettingsBtn = document.getElementById('close-settings');
-const saveSettingsBtn = document.getElementById('save-settings');
-const resetSettingsBtn = document.getElementById('reset-settings');
+// Settings Modal Management - initialized after DOM loads
+function setupSettingsModal() {
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsBtn = document.getElementById('settings-btn');
+  const closeSettingsBtn = document.getElementById('close-settings');
+  const saveSettingsBtn = document.getElementById('save-settings');
+  const resetSettingsBtn = document.getElementById('reset-settings');
 
-if (settingsBtn) {
-  settingsBtn.addEventListener('click', openSettingsModal);
-}
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', openSettingsModal);
+  }
 
-if (closeSettingsBtn) {
-  closeSettingsBtn.addEventListener('click', closeSettingsModal);
-}
+  if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', closeSettingsModal);
+  }
 
-if (saveSettingsBtn) {
-  saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
-}
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
+  }
 
-if (resetSettingsBtn) {
-  resetSettingsBtn.addEventListener('click', resetSettings);
-}
+  if (resetSettingsBtn) {
+    resetSettingsBtn.addEventListener('click', resetSettings);
+  }
 
-// Click outside modal to close
-if (settingsModal) {
-  settingsModal.addEventListener('click', (e) => {
-    if (e.target === settingsModal) {
-      closeSettingsModal();
+  // Click outside modal to close
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      console.log('[Debug] Modal clicked, target:', e.target.className);
+      if (e.target === settingsModal) {
+        closeSettingsModal();
+      }
+    });
+  }
+
+  // Add Escape key listener
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const settingsModal = document.getElementById('settings-modal');
+      if (settingsModal && !settingsModal.classList.contains('hidden')) {
+        closeSettingsModal();
+      }
     }
   });
 }
 
 function openSettingsModal() {
+  const settingsModal = document.getElementById('settings-modal');
   if (!settingsModal) return;
 
   // Populate modal with current settings
@@ -974,11 +1011,21 @@ function openSettingsModal() {
 
   settingsModal.classList.remove('hidden');
 
-  // Load HuggingFace token
-  loadHFToken();
+  // Load HuggingFace token if input exists
+  const hfTokenInput = document.getElementById('hf-token-input');
+  if (hfTokenInput) {
+    window.electronAPI.getHFToken().then(result => {
+      if (result.success && result.token) {
+        hfTokenInput.value = result.token;
+      }
+    }).catch(error => {
+      console.error('Error loading HF token:', error);
+    });
+  }
 }
 
 function closeSettingsModal() {
+  const settingsModal = document.getElementById('settings-modal');
   if (settingsModal) {
     settingsModal.classList.add('hidden');
   }
@@ -1044,6 +1091,9 @@ loadSettings();
 
 // Wait for DOM to load before setting up HF authentication
 document.addEventListener('DOMContentLoaded', () => {
+  // Setup settings modal event listeners
+  setupSettingsModal();
+
   // HuggingFace Authentication Elements
   const hfTokenInput = document.getElementById('hf-token-input');
   const hfTokenLink = document.getElementById('hf-token-link');
@@ -1096,7 +1146,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Test token
   if (testHFTokenBtn) {
     testHFTokenBtn.addEventListener('click', async () => {
+      console.log('[HF Token] Test button clicked');
       const token = hfTokenInput.value.trim();
+      console.log('[HF Token] Token length:', token.length);
 
       if (!token) {
         showHFStatus('Please enter a token first', 'error');
@@ -1105,19 +1157,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
       testHFTokenBtn.disabled = true;
       testHFTokenBtn.textContent = 'Testing...';
+      console.log('[HF Token] Calling testHFToken API...');
 
-      const result = await window.electronAPI.testHFToken(token);
+      try {
+        const result = await window.electronAPI.testHFToken(token);
+        console.log('[HF Token] API result:', result);
 
-      testHFTokenBtn.disabled = false;
-      testHFTokenBtn.textContent = 'Test Token';
+        testHFTokenBtn.disabled = false;
 
-      if (result.success && result.valid) {
-        const username = result.username ? ` (${result.username})` : '';
-        showHFStatus(`Token is valid${username}`, 'success');
-      } else {
-        showHFStatus(`${result.error || 'Invalid token'}`, 'error');
+        if (result.success && result.valid) {
+          // Success state
+          testHFTokenBtn.textContent = 'Success';
+          testHFTokenBtn.style.backgroundColor = '#16a34a';
+          testHFTokenBtn.style.color = 'white';
+          testHFTokenBtn.style.borderColor = '#16a34a';
+
+          const username = result.username ? ` (${result.username})` : '';
+          showHFStatus(`Token is valid${username}`, 'success');
+
+          // Reset button after 3 seconds
+          setTimeout(() => {
+            testHFTokenBtn.textContent = 'Test Token';
+            testHFTokenBtn.style.backgroundColor = '';
+            testHFTokenBtn.style.color = '';
+            testHFTokenBtn.style.borderColor = '';
+          }, 3000);
+        } else {
+          // Failed state
+          testHFTokenBtn.textContent = 'Failed';
+          testHFTokenBtn.style.backgroundColor = '#dc2626';
+          testHFTokenBtn.style.color = 'white';
+          testHFTokenBtn.style.borderColor = '#dc2626';
+
+          showHFStatus(`${result.error || 'Invalid token'}`, 'error');
+
+          // Reset button after 3 seconds
+          setTimeout(() => {
+            testHFTokenBtn.textContent = 'Test Token';
+            testHFTokenBtn.style.backgroundColor = '';
+            testHFTokenBtn.style.color = '';
+            testHFTokenBtn.style.borderColor = '';
+          }, 3000);
+        }
+      } catch (error) {
+        console.error('[HF Token] Error testing token:', error);
+        testHFTokenBtn.disabled = false;
+
+        // Failed state
+        testHFTokenBtn.textContent = 'Failed';
+        testHFTokenBtn.style.backgroundColor = '#dc2626';
+        testHFTokenBtn.style.color = 'white';
+        testHFTokenBtn.style.borderColor = '#dc2626';
+
+        showHFStatus(`Error: ${error.message}`, 'error');
+
+        // Reset button after 3 seconds
+        setTimeout(() => {
+          testHFTokenBtn.textContent = 'Test Token';
+          testHFTokenBtn.style.backgroundColor = '';
+          testHFTokenBtn.style.color = '';
+          testHFTokenBtn.style.borderColor = '';
+        }, 3000);
       }
     });
+  } else {
+    console.warn('[HF Token] Test button not found!');
   }
 
   // Save token
@@ -1466,22 +1570,53 @@ async function stopRecording() {
     const result = await state.audioRecorder.stopRecording();
 
     state.isRecording = false;
-    state.recordedAudio = result;
 
-    // Update UI
-    elements.recordingIndicator.classList.add('hidden');
-    elements.recordAudioBtn.classList.remove('hidden');
-    elements.recordingPreview.classList.remove('hidden');
-    document.body.classList.remove('recording-active');
+    // Convert blob to ArrayBuffer using FileReader
+    const arrayBuffer = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Failed to read blob'));
+      reader.readAsArrayBuffer(result.blob);
+    });
 
-    // Update preview info
-    const durationText = formatDuration(result.duration);
-    elements.recordingPreview.querySelector('.preview-duration').textContent = durationText;
+    // Save to temporary file immediately
+    const saveResult = await window.electronAPI.saveRecording({
+      blob: arrayBuffer,
+      mimeType: result.mimeType,
+      duration: result.duration
+    });
 
-    showToast('Recording stopped', 'success');
+    if (saveResult.success) {
+      // Store recording info with file path
+      state.recordedAudio = {
+        ...result,
+        filePath: saveResult.filePath,
+        fileName: saveResult.fileName
+      };
+
+      // Update UI
+      elements.recordingIndicator.classList.add('hidden');
+      elements.recordAudioBtn.classList.remove('hidden');
+      elements.recordingPreview.classList.remove('hidden');
+      document.body.classList.remove('recording-active');
+
+      // Update preview info
+      const durationText = formatDuration(result.duration);
+      elements.recordingPreview.querySelector('.preview-duration').textContent = durationText;
+
+      showToast('Recording stopped', 'success');
+    } else {
+      throw new Error('Failed to save recording: ' + saveResult.error);
+    }
   } catch (error) {
     console.error('Error stopping recording:', error);
     showToast('Failed to stop recording: ' + error.message, 'error');
+
+    // Reset UI on error
+    state.isRecording = false;
+    elements.recordingIndicator.classList.add('hidden');
+    elements.recordAudioBtn.classList.remove('hidden');
+    document.body.classList.remove('recording-active');
   }
 }
 
@@ -1503,29 +1638,125 @@ function updateRecordingTime(seconds) {
  * Play recorded audio preview
  */
 function playRecordedAudio() {
-  if (!state.recordedAudio) {
+  if (!state.recordedAudio || !state.recordedAudio.filePath) {
+    showToast('No recorded audio available', 'error');
+    return;
+  }
+
+  // Stop any currently playing audio
+  if (state.currentAudioPlayer) {
+    state.currentAudioPlayer.pause();
+    state.currentAudioPlayer = null;
+  }
+
+  try {
+    console.log('Playing audio from file:', state.recordedAudio.filePath);
+
+    // Create audio element from file path
+    const audio = new Audio();
+    // Use file:// protocol for local files
+    audio.src = `file://${state.recordedAudio.filePath}`;
+    state.currentAudioPlayer = audio;
+
+    const playBtn = elements.playRecordingBtn;
+    const originalText = playBtn.textContent;
+
+    // Update button to show it's playing
+    playBtn.textContent = '⏸ Playing...';
+    playBtn.disabled = true;
+
+    // Wait for audio to be ready
+    audio.addEventListener('loadedmetadata', () => {
+      console.log('Audio metadata loaded, duration:', audio.duration);
+    });
+
+    audio.addEventListener('canplay', () => {
+      console.log('Audio ready to play');
+    });
+
+    // Handle play promise
+    const playPromise = audio.play();
+
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log('Audio playback started successfully');
+          showToast('Playing recording...', 'info', 1000);
+        })
+        .catch(error => {
+          console.error('Playback error:', error);
+          showToast('Playback failed: ' + error.message, 'error');
+          playBtn.textContent = originalText;
+          playBtn.disabled = false;
+          state.currentAudioPlayer = null;
+        });
+    }
+
+    // Reset button when playback ends
+    audio.onended = () => {
+      console.log('Audio playback ended');
+      playBtn.textContent = originalText;
+      playBtn.disabled = false;
+      showToast('Playback finished', 'success', 1000);
+      state.currentAudioPlayer = null;
+    };
+
+    // Handle errors during playback
+    audio.onerror = (e) => {
+      console.error('Audio error event:', e, 'Error code:', audio.error);
+      showToast('Audio playback error: ' + (audio.error ? audio.error.message : 'Unknown error'), 'error');
+      playBtn.textContent = originalText;
+      playBtn.disabled = false;
+      state.currentAudioPlayer = null;
+    };
+
+  } catch (error) {
+    console.error('Error playing audio:', error);
+    showToast('Failed to play audio: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Open folder containing the recorded file
+ */
+function openRecordingFolder() {
+  if (!state.recordedAudio || !state.recordedAudio.filePath) {
     showToast('No recorded audio available', 'error');
     return;
   }
 
   try {
-    const audio = state.audioRecorder.createAudioElement();
-    audio.play();
-
-    // Update button text during playback
-    const playBtn = elements.playRecordingBtn;
-    const originalText = playBtn.textContent;
-    playBtn.textContent = '⏸ Playing...';
-    playBtn.disabled = true;
-
-    audio.onended = () => {
-      playBtn.textContent = originalText;
-      playBtn.disabled = false;
-    };
+    window.electronAPI.showItemInFolder(state.recordedAudio.filePath);
   } catch (error) {
-    console.error('Error playing audio:', error);
-    showToast('Failed to play audio: ' + error.message, 'error');
+    console.error('Error opening folder:', error);
+    showToast('Failed to open folder: ' + error.message, 'error');
   }
+}
+
+/**
+ * Load a recorded file from disk into the preview
+ */
+function loadRecordedFile(filePath, fileName, duration) {
+  // Get duration from file stats if not provided
+  if (!duration) {
+    duration = 0; // Will show 0:00 if duration unknown
+  }
+
+  // Set as recorded audio
+  state.recordedAudio = {
+    filePath: filePath,
+    fileName: fileName || filePath.split('/').pop().split('\\').pop(),
+    duration: duration
+  };
+
+  // Show recording preview
+  elements.recordingPreview.classList.remove('hidden');
+
+  // Update preview info
+  const durationText = formatDuration(duration);
+  elements.recordingPreview.querySelector('.preview-duration').textContent = durationText;
+
+  showToast('Recording loaded', 'success');
 }
 
 /**
@@ -1541,37 +1772,25 @@ function discardRecording() {
  * Use recording for transcription
  */
 async function useRecording() {
-  if (!state.recordedAudio) {
+  if (!state.recordedAudio || !state.recordedAudio.filePath) {
     showToast('No recorded audio available', 'error');
     return;
   }
 
   try {
-    // Save the recorded audio blob to a temporary file
-    const result = await window.electronAPI.saveRecording({
-      blob: state.recordedAudio.blob,
-      mimeType: state.recordedAudio.mimeType,
-      duration: state.recordedAudio.duration
-    });
+    // File is already saved, just use it
+    state.selectedFile = state.recordedAudio.filePath;
 
-    if (result.success) {
-      // Set as selected file
-      state.selectedFile = result.filePath;
-      state.recordedAudio.filePath = result.filePath;
+    // Update UI to show file info
+    showFileInfo(state.recordedAudio.filePath);
 
-      // Update UI to show file info
-      showFileInfo(result.filePath);
+    // Hide recording preview
+    elements.recordingPreview.classList.add('hidden');
 
-      // Hide recording preview
-      elements.recordingPreview.classList.add('hidden');
+    // Enable transcribe button
+    updateTranscribeButton();
 
-      // Enable transcribe button
-      updateTranscribeButton();
-
-      showToast('Recording ready for transcription', 'success');
-    } else {
-      showToast('Failed to save recording: ' + result.error, 'error');
-    }
+    showToast('Recording ready for transcription', 'success');
   } catch (error) {
     console.error('Error using recording:', error);
     showToast('Failed to prepare recording: ' + error.message, 'error');
@@ -1585,5 +1804,29 @@ function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+// ========================================
+// AUTO-UPDATE BANNER (LINEAR-STYLE)
+// ========================================
+
+// Listen for update ready event and show banner
+if (window.electronAPI && window.electronAPI.onUpdateReady) {
+  window.electronAPI.onUpdateReady((updateInfo) => {
+    console.log('[Auto-Update] Update ready:', updateInfo.version);
+    const updateBanner = document.getElementById('update-banner');
+    const reloadBtn = document.getElementById('reload-for-update-btn');
+
+    if (updateBanner) {
+      updateBanner.classList.remove('hidden');
+    }
+
+    if (reloadBtn) {
+      reloadBtn.addEventListener('click', () => {
+        console.log('[Auto-Update] User clicked reload, restarting...');
+        window.electronAPI.restartToUpdate();
+      });
+    }
+  });
 }
 

@@ -28,8 +28,8 @@ This guide covers building, packaging, and distributing VAI Studio for developer
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/localvoice-ai.git
-cd localvoice-ai
+git clone https://github.com/oddcommunity/VAI-Studio.git
+cd VAI-Studio
 
 # Install Node dependencies
 npm install

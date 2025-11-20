@@ -5,33 +5,39 @@
 ### Step 1: Get App-Specific Password (One-time setup)
 
 1. Go to https://appleid.apple.com
-2. Sign in with your Apple ID: `henrylove11@protonmail.com`
+2. Sign in with your Apple ID (the email associated with your Apple Developer account)
 3. Under **Security** → **App-Specific Passwords**
 4. Click **Generate password**
 5. Name it: `VAI Studio Notarization`
 6. **Save the generated password** (format: `xxxx-xxxx-xxxx-xxxx`)
+
+**Note**: See `BUILD_CONFIGURATION.md` for detailed setup instructions with your personal credentials.
 
 ### Step 2: Set Environment Variables
 
 Open Terminal and run:
 
 ```bash
-export APPLE_ID="henrylove11@protonmail.com"
+export APPLE_ID="your-apple-id@example.com"  # Your Apple Developer account email
 export APPLE_ID_PASSWORD="xxxx-xxxx-xxxx-xxxx"  # Use the password from Step 1
+export APPLE_TEAM_ID="YOUR_TEAM_ID"  # Your 10-character Apple Team ID
 ```
 
 **Optional**: Add these to your `~/.zshrc` or `~/.bash_profile` to persist:
 
 ```bash
-echo 'export APPLE_ID="henrylove11@protonmail.com"' >> ~/.zshrc
+echo 'export APPLE_ID="your-apple-id@example.com"' >> ~/.zshrc
 echo 'export APPLE_ID_PASSWORD="xxxx-xxxx-xxxx-xxxx"' >> ~/.zshrc
+echo 'export APPLE_TEAM_ID="YOUR_TEAM_ID"' >> ~/.zshrc
 source ~/.zshrc
 ```
+
+**IMPORTANT**: Replace the placeholder values with your actual credentials. See `BUILD_CONFIGURATION.md` for instructions.
 
 ### Step 3: Build the App
 
 ```bash
-cd "/Users/exeai/Projects/VAI Studio"
+cd ~/Projects/VAI-Studio  # Or wherever you cloned the repository
 ./scripts/build-mac-signed.sh
 ```
 
@@ -88,19 +94,19 @@ If you don't have the app-specific password yet:
 security find-identity -v -p codesigning
 ```
 
-You should see: `Developer ID Application: Henry Love (6L989H4F6A)`
+You should see: `Developer ID Application: YOUR_NAME (YOUR_TEAM_ID)`
 
 ### "Notarization failed"
 
 **Possible causes**:
 1. Wrong app-specific password → Regenerate at https://appleid.apple.com
 2. Expired password → Generate a new one
-3. Wrong Apple ID → Should be `henrylove11@protonmail.com`
+3. Wrong Apple ID → Use your Apple Developer account email
 
 **Check notarization status**:
 
 ```bash
-xcrun notarytool history --apple-id henrylove11@protonmail.com
+xcrun notarytool history --apple-id your-apple-id@example.com
 ```
 
 ### "Build failed"

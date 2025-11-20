@@ -3,11 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'self' file:;">
   <title>VAI Studio - Speech-to-Text Testing</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Update Banner (Linear-style) -->
+  <div id="update-banner" class="update-banner hidden">
+    <span>A new version is ready!</span>
+    <button id="reload-for-update-btn" class="btn btn-sm btn-success">Reload to Update</button>
+  </div>
+
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
@@ -27,10 +33,13 @@
     <main class="main-content">
       <!-- Left Panel: Controls -->
       <aside class="controls-panel">
-        <section class="control-section">
+        <section class="control-section audio-input-section">
           <h2>Audio Input</h2>
           <div class="file-upload">
-            <button id="select-file-btn" class="btn btn-primary">Select Audio File</button>
+            <div class="button-row">
+              <button id="select-file-btn" class="btn btn-primary flex-1">Select Audio File</button>
+              <button id="view-recordings-folder-btn" class="btn btn-sm btn-recordings">Select Recorded Audio</button>
+            </div>
             <button id="select-multiple-files-btn" class="btn btn-sm margin-top-05 width-full">+ Add Multiple Files</button>
             <div id="file-info" class="file-info hidden">
               <div class="flex-between">
@@ -61,8 +70,9 @@
               </div>
               <div class="recording-actions">
                 <button id="play-recording-btn" class="btn btn-sm">▶ Play</button>
-                <button id="discard-recording-btn" class="btn btn-sm color-error">✕ Discard</button>
-                <button id="use-recording-btn" class="btn btn-sm btn-success">✓ Use Recording</button>
+                <button id="open-recording-folder-btn" class="btn btn-sm">Show File</button>
+                <button id="discard-recording-btn" class="btn btn-sm color-error">Discard</button>
+                <button id="use-recording-btn" class="btn btn-sm btn-success">Use</button>
               </div>
             </div>
           </div>
@@ -207,7 +217,6 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>Advanced Settings</h2>
-        <button id="close-settings" class="modal-close">×</button>
       </div>
       
       <div class="modal-body">
@@ -227,7 +236,8 @@
           </label>
 
           <p class="text-sm color-muted margin-top-05 margin-bottom-1">
-            Get your free token at: <a href="#" id="hf-token-link" class="color-link">huggingface.co/settings/tokens</a>
+            Get your free token at: <a href="#" id="hf-token-link" class="color-link">huggingface.co/settings/tokens</a><br>
+            Select "Read" Type When Creating Tokens
           </p>
 
           <div class="hf-button-row">

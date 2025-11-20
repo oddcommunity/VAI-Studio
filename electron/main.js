@@ -41,10 +41,8 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
 
-  // Open DevTools in development
-  if (process.argv.includes('--dev')) {
-    mainWindow.webContents.openDevTools();
-  }
+  // Open DevTools in development - always open for debugging
+  mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -52,10 +50,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Initialize auto-updater after app is ready
+  // Initialize auto-updater after app is ready (Linear-style UX)
   const { autoUpdater: updater } = require('electron-updater');
   autoUpdater = updater;
-  autoUpdater.autoDownload = false;
+  autoUpdater.autoDownload = true; // Download silently in background
   autoUpdater.autoInstallOnAppQuit = true;
   console.log('[Auto-Update] System initialized');
 
@@ -66,24 +64,8 @@ app.whenReady().then(() => {
 
   autoUpdater.on('update-available', (info) => {
     console.log('[Auto-Update] Update available:', info.version);
-    if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available!`,
-        detail: 'Would you like to download it now?',
-        buttons: ['Download', 'Later'],
-        defaultId: 0,
-        cancelId: 1
-      }).then(result => {
-        if (result.response === 0) {
-          autoUpdater.downloadUpdate();
-          if (mainWindow) {
-            mainWindow.webContents.send('update-downloading');
-          }
-        }
-      });
-    }
+    console.log('[Auto-Update] Downloading silently in background...');
+    // No dialog - just download automatically
   });
 
   autoUpdater.on('update-not-available', () => {
@@ -98,26 +80,18 @@ app.whenReady().then(() => {
     let log = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`;
     log += ` (${progressObj.transferred}/${progressObj.total})`;
     console.log('[Auto-Update]', log);
+    // Optionally send progress to renderer (for subtle progress indicator)
     if (mainWindow) {
       mainWindow.webContents.send('update-progress', progressObj);
     }
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[Auto-Update] Update downloaded');
+    console.log('[Auto-Update] Update downloaded and ready');
+    // Send message to renderer to show "Reload to update" banner
     if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Ready',
-        message: 'Update downloaded successfully!',
-        detail: 'The application will restart to install the update.',
-        buttons: ['Restart Now', 'Restart Later'],
-        defaultId: 0,
-        cancelId: 1
-      }).then(result => {
-        if (result.response === 0) {
-          autoUpdater.quitAndInstall(false, true);
-        }
+      mainWindow.webContents.send('update-ready', {
+        version: info.version
       });
     }
   });
@@ -651,14 +625,34 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
+// IPC handler for restarting to install update (Linear-style)
+ipcMain.handle('restart-to-update', () => {
+  console.log('[Auto-Update] Restarting to install update...');
+  autoUpdater.quitAndInstall(false, true);
+});
+
 // ========================================
 // VOICE RECORDING IPC HANDLERS
 // ========================================
 
-// Save recorded audio blob to temporary file
+// Get or create the recordings folder
+function getRecordingsFolder() {
+  const os = require('os');
+  const homeDir = os.homedir();
+  const recordingsDir = path.join(homeDir, 'VAI - Recorded Audio');
+
+  // Create directory if it doesn't exist
+  if (!fs.existsSync(recordingsDir)) {
+    fs.mkdirSync(recordingsDir, { recursive: true });
+    console.log('[Recording] Created recordings folder:', recordingsDir);
+  }
+
+  return recordingsDir;
+}
+
+// Save recorded audio blob to file
 ipcMain.handle('save-recording', async (event, { blob, mimeType, duration }) => {
   try {
-    const os = require('os');
     const crypto = require('crypto');
 
     // Generate unique filename
@@ -672,10 +666,10 @@ ipcMain.handle('save-recording', async (event, { blob, mimeType, duration }) => 
     else if (mimeType.includes('audio/wav')) extension = 'wav';
     else if (mimeType.includes('audio/webm')) extension = 'webm';
 
-    // Create temporary file path
-    const tempDir = os.tmpdir();
+    // Create file path in dedicated recordings folder
+    const recordingsDir = getRecordingsFolder();
     const fileName = `vai-recording-${timestamp}-${randomId}.${extension}`;
-    const filePath = path.join(tempDir, fileName);
+    const filePath = path.join(recordingsDir, fileName);
 
     // Convert blob data (received as array buffer) to Buffer
     const buffer = Buffer.from(blob);
@@ -697,6 +691,68 @@ ipcMain.handle('save-recording', async (event, { blob, mimeType, duration }) => 
       success: false,
       error: error.message
     };
+  }
+});
+
+// Show recording file in folder
+ipcMain.handle('show-item-in-folder', async (event, filePath) => {
+  try {
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('[Recording] Error showing file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Open recordings folder
+ipcMain.handle('open-recordings-folder', async () => {
+  try {
+    // Get or create the recordings folder
+    const recordingsDir = getRecordingsFolder();
+
+    // Open the recordings directory in file explorer
+    shell.openPath(recordingsDir);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Recording] Error opening folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Select audio file from recordings folder
+ipcMain.handle('select-from-recordings', async () => {
+  try {
+    const recordingsDir = getRecordingsFolder();
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      defaultPath: recordingsDir,
+      filters: [
+        { name: 'Audio Files', extensions: ['webm', 'mp3', 'wav', 'm4a', 'ogg', 'flac'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    const filePath = result.filePaths[0];
+    const fileName = path.basename(filePath);
+
+    // Try to get file stats for duration (we can't easily get audio duration without loading it)
+    // For now, just return 0 for duration
+    return {
+      success: true,
+      filePath: filePath,
+      fileName: fileName,
+      duration: 0
+    };
+  } catch (error) {
+    console.error('[Recording] Error selecting file:', error);
+    return { success: false, error: error.message };
   }
 });
 
