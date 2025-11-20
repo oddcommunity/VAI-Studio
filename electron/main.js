@@ -41,8 +41,10 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
 
-  // Open DevTools in development - always open for debugging
-  mainWindow.webContents.openDevTools();
+  // Open DevTools only in development (--dev flag or when not packaged)
+  if (process.argv.includes('--dev') || !app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
 
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -131,7 +133,8 @@ function runPythonCommand(args) {
       // Production (packaged app) - use bundled Python from extraResources
       const platform = process.platform;
       const pythonExecutable = platform === 'win32' ? 'python.exe' : 'python3';
-      pythonPath = path.join(process.resourcesPath, 'backends', 'venv', 'bin', pythonExecutable);
+      const venvBinDir = platform === 'win32' ? 'Scripts' : 'bin';  // Windows uses Scripts/, Unix uses bin/
+      pythonPath = path.join(process.resourcesPath, 'backends', 'venv', venvBinDir, pythonExecutable);
       scriptPath = path.join(process.resourcesPath, 'backends', 'runner.py');
       console.log('[Python] Using bundled Python:', pythonPath);
       console.log('[Python] Using bundled scripts:', scriptPath);

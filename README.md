@@ -1,9 +1,9 @@
-# LocalVoice AI
+# VAI Studio
 
 **LM Studio for Speech-to-Text** - Test and compare local STT models on your desktop
 
 ![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)
 ![API](https://img.shields.io/badge/API-documented-orange.svg)

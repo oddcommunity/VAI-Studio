@@ -75,11 +75,7 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "type": "distribution",
-      "identity": "Developer ID Application: YOUR_NAME (YOUR_TEAM_ID)",
-      "notarize": {
-        "teamId": "YOUR_TEAM_ID"
-      }
+      "type": "distribution"
     },
     "win": {
       "target": [
