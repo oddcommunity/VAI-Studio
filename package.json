@@ -111,6 +111,17 @@
     }
   },
   "dependencies": {
+    "@odd-core/api": "link:/root/odd-core/packages/api",
+    "@odd-core/auth": "link:/root/odd-core/packages/auth",
+    "@odd-core/crypto": "link:/root/odd-core/packages/crypto",
+    "@odd-core/feature-flags": "link:/root/odd-core/packages/feature-flags",
+    "@odd-core/license": "link:/root/odd-core/packages/license",
+    "@odd-core/log": "link:/root/odd-core/packages/log",
+    "@odd-core/notifications": "link:/root/odd-core/packages/notifications",
+    "@odd-core/storage": "link:/root/odd-core/packages/storage",
+    "@odd-core/telemetry": "link:/root/odd-core/packages/telemetry",
+    "@odd-core/types": "link:/root/odd-core/packages/types",
+    "@odd-core/validation": "link:/root/odd-core/packages/validation",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.1.7",
     "ffmpeg-static": "^5.3.0"

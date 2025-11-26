@@ -5,6 +5,10 @@ const fs = require('fs');
 const os = require('os');
 const ElectronStore = require('electron-store');
 
+// Initialize Odd-Core services
+const { getLogger } = require('./odd-core-integration');
+const logger = getLogger();
+
 const store = new ElectronStore.default();
 let mainWindow;
 let autoUpdater;
@@ -25,7 +29,11 @@ crashReporter.start({
   }
 });
 
-console.log('[Crash Reporter] Crash reporting initialized');
+logger.info('Crash reporting initialized', {
+  version: app.getVersion(),
+  platform: process.platform,
+  arch: process.arch
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -58,31 +66,31 @@ app.whenReady().then(() => {
   autoUpdater = updater;
   autoUpdater.autoDownload = true; // Download silently in background
   autoUpdater.autoInstallOnAppQuit = true;
-  console.log('[Auto-Update] System initialized');
+  logger.info('Auto-update system initialized');
 
   // Set up auto-updater event handlers
   autoUpdater.on('checking-for-update', () => {
-    console.log('[Auto-Update] Checking for update...');
+    logger.info('Checking for updates...');
   });
 
   autoUpdater.on('update-available', (info) => {
-    console.log('[Auto-Update] Update available:', info.version);
-    console.log('[Auto-Update] Downloading silently in background...');
-    // No dialog - just download automatically
+    logger.info('Update available, downloading in background', { version: info.version });
   });
 
   autoUpdater.on('update-not-available', () => {
-    console.log('[Auto-Update] No updates available');
+    logger.info('No updates available');
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('[Auto-Update] Error:', err);
+    logger.error('Auto-update error', { error: err.message });
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
-    let log = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`;
-    log += ` (${progressObj.transferred}/${progressObj.total})`;
-    console.log('[Auto-Update]', log);
+    logger.info('Update download progress', {
+      percent: progressObj.percent,
+      transferred: progressObj.transferred,
+      total: progressObj.total
+    });
     // Optionally send progress to renderer (for subtle progress indicator)
     if (mainWindow) {
       mainWindow.webContents.send('update-progress', progressObj);
@@ -90,7 +98,7 @@ app.whenReady().then(() => {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[Auto-Update] Update downloaded and ready');
+    logger.info('Update downloaded and ready', { version: info.version });
     // Send message to renderer to show "Reload to update" banner
     if (mainWindow) {
       mainWindow.webContents.send('update-ready', {
@@ -235,10 +243,10 @@ function getFfmpegPath() {
       ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
     }
 
-    console.log('[FFmpeg] Path:', ffmpegPath);
+    logger.info('FFmpeg path resolved', { ffmpegPath });
     return ffmpegPath;
   } catch (e) {
-    console.error('[FFmpeg] Failed to get ffmpeg-static path:', e);
+    logger.error('Failed to get ffmpeg-static path', { error: e.message });
     return null;
   }
 }
@@ -358,9 +366,14 @@ ipcMain.handle('transcribe', async (event, { audioPath, backend, modelName, task
   try {
     // Convert audio to WAV if needed (handles WebM, MP4, OGG, etc.)
     // This ensures Python only needs to handle WAV files
-    console.log('[Transcribe] Original audio path:', audioPath);
+    logger.info('Starting transcription', {
+      originalPath: audioPath,
+      backend,
+      modelName,
+      task
+    });
     convertedPath = await convertToWav(audioPath);
-    console.log('[Transcribe] Using audio path:', convertedPath);
+    logger.info('Audio converted', { convertedPath });
 
     const args = ['transcribe', backend, convertedPath, modelName];
     if (task) {
@@ -368,9 +381,19 @@ ipcMain.handle('transcribe', async (event, { audioPath, backend, modelName, task
     }
 
     const result = await runPythonCommand(args);
+    logger.info('Transcription completed', {
+      success: result.success,
+      backend,
+      modelName
+    });
     return result;
   } catch (error) {
-    console.error('Error transcribing:', error);
+    logger.error('Transcription failed', {
+      error: error.message,
+      backend,
+      modelName,
+      audioPath
+    });
     return { success: false, error: error.message };
   } finally {
     // Clean up temporary WAV file if we created one
