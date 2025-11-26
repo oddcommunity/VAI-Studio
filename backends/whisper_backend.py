@@ -7,6 +7,7 @@ import time
 import os
 import sys
 from typing import Dict, List
+import soundfile as sf
 from base import STTBackend, ModelInfo
 from progress import report_progress
 
@@ -167,63 +168,54 @@ class WhisperBackend(STTBackend):
             if is_downloading:
                 report_progress(28, 'Download complete! Model loaded.', 'loaded')
 
-            # Load and convert audio to WAV if needed (M4A not always supported)
-            import librosa
-            import soundfile as sf
-            import tempfile
-
+            # Audio is already converted to WAV (16kHz mono) by Electron (via ffmpeg-static)
+            # Load audio with soundfile (no ffmpeg needed!)
             report_progress(30, 'Loading audio file...', 'loading_audio')
-            print(f"[INFO] Loading audio file: {audio_path}", file=sys.stderr)
-            # Load audio with librosa (supports M4A via audioread/ffmpeg)
-            audio_data, sample_rate = librosa.load(audio_path, sr=16000, mono=True)
+            print(f"[INFO] Loading audio file with soundfile: {audio_path}", file=sys.stderr)
 
-            # Save to temporary WAV file for Whisper
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
-                temp_wav_path = tmp_file.name
-                sf.write(temp_wav_path, audio_data, sample_rate)
+            # Read WAV file directly with soundfile
+            # Returns: (audio_data, sample_rate) where audio_data is float32 numpy array
+            audio_data, sample_rate = sf.read(audio_path, dtype='float32')
+            print(f"[INFO] Audio loaded: {len(audio_data)} samples at {sample_rate}Hz", file=sys.stderr)
 
-            try:
-                # Transcribe
-                report_progress(50, 'Transcribing audio...', 'transcribing')
-                print(f"[INFO] Transcribing with Whisper {model_name}...", file=sys.stderr)
+            # Transcribe using numpy array (bypasses whisper's ffmpeg call!)
+            report_progress(50, 'Transcribing audio...', 'transcribing')
+            print(f"[INFO] Transcribing with Whisper {model_name} (numpy array input)...", file=sys.stderr)
 
-                # Handle quantized model (transformers pipeline) vs native Whisper
-                if model_name == 'large-v3-quantized-w4a16':
-                    # Transformers pipeline call - enable timestamps for long audio files
-                    result = model(temp_wav_path, return_timestamps=True)
-                    report_progress(90, 'Processing results...', 'finalizing')
-                    processing_time = time.time() - start_time
+            # Handle quantized model (transformers pipeline) vs native Whisper
+            if model_name == 'large-v3-quantized-w4a16':
+                # Transformers pipeline accepts numpy array directly
+                result = model(audio_data, return_timestamps=True)
+                report_progress(90, 'Processing results...', 'finalizing')
+                processing_time = time.time() - start_time
 
-                    # Extract text and segments from result
-                    text = result['text'].strip() if isinstance(result, dict) else str(result).strip()
-                    segments = result.get('chunks', []) if isinstance(result, dict) else []
+                # Extract text and segments from result
+                text = result['text'].strip() if isinstance(result, dict) else str(result).strip()
+                segments = result.get('chunks', []) if isinstance(result, dict) else []
 
-                    return {
-                        'text': text,
-                        'processing_time': round(processing_time, 2),
-                        'segments': segments,
-                        'language': 'auto',
-                        'model': model_name,
-                        'backend': 'whisper'
-                    }
-                else:
-                    # Native Whisper model call
-                    result = model.transcribe(temp_wav_path, **kwargs)
-                    report_progress(90, 'Processing results...', 'finalizing')
-                    processing_time = time.time() - start_time
+                return {
+                    'text': text,
+                    'processing_time': round(processing_time, 2),
+                    'segments': segments,
+                    'language': 'auto',
+                    'model': model_name,
+                    'backend': 'whisper'
+                }
+            else:
+                # Native Whisper model accepts numpy array directly
+                # This bypasses whisper's load_audio() which calls ffmpeg!
+                result = model.transcribe(audio_data, **kwargs)
+                report_progress(90, 'Processing results...', 'finalizing')
+                processing_time = time.time() - start_time
 
-                    return {
-                        'text': result['text'].strip(),
-                        'processing_time': round(processing_time, 2),
-                        'segments': result.get('segments', []),
-                        'language': result.get('language', 'unknown'),
-                        'model': model_name,
-                        'backend': 'whisper'
-                    }
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_wav_path):
-                    os.unlink(temp_wav_path)
+                return {
+                    'text': result['text'].strip(),
+                    'processing_time': round(processing_time, 2),
+                    'segments': result.get('segments', []),
+                    'language': result.get('language', 'unknown'),
+                    'model': model_name,
+                    'backend': 'whisper'
+                }
 
         except Exception as e:
             processing_time = time.time() - start_time

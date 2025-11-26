@@ -1,5 +1,5 @@
-// LocalVoice AI - Main Application Logic
-// Version 2.0 - Multi-Backend with Comparison
+// VAI Studio - Main Application Logic
+// Version 3.0 - Multi-Backend with Comparison
 
 // State
 let state = {
@@ -101,14 +101,73 @@ function initElements() {
   };
 }
 
+// Load and display build info (version and build date)
+async function loadBuildInfo() {
+  try {
+    const response = await fetch('build-info.json');
+    if (response.ok) {
+      const buildInfo = await response.json();
+
+      // Update version display
+      const versionEl = document.getElementById('app-version');
+      if (versionEl && buildInfo.version) {
+        versionEl.textContent = `v${buildInfo.version}`;
+      }
+
+      // Update build date display
+      const dateEl = document.getElementById('build-date');
+      if (dateEl && buildInfo.buildDate) {
+        // Format date nicely (e.g., "Nov 24, 2025")
+        const date = new Date(buildInfo.buildDate);
+        const formatted = date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        dateEl.textContent = formatted;
+      }
+
+      console.log('[Build Info] Version:', buildInfo.version, 'Built:', buildInfo.buildDate);
+    }
+  } catch (e) {
+    // build-info.json might not exist in dev mode, that's OK
+    console.log('[Build Info] Not available (dev mode)');
+  }
+}
+
 // Initialize the app
 async function init() {
   console.log('Initializing LocalVoice AI...');
   initElements();
-  await loadBackends();
+
+  // Load build info (version, date)
+  loadBuildInfo();
+
+  // Show loading state immediately
+  showModelLoadingState();
+
+  // Load backends asynchronously (don't block UI)
+  loadBackends().catch(error => {
+    console.error('Failed to load backends:', error);
+    showError('Failed to load backends: ' + error.message);
+  });
+
   setupEventListeners();
   setupProgressListener();
   console.log('Initialization complete');
+}
+
+// Show loading state in MODEL section
+function showModelLoadingState() {
+  const container = document.getElementById('model-select-container');
+  if (container) {
+    container.innerHTML = `
+      <div class="model-loading">
+        <div class="loading-spinner"></div>
+        <span>Loading models...</span>
+      </div>
+    `;
+  }
 }
 
 // State for tracking comparison mode progress
@@ -561,13 +620,7 @@ function createResultCard(backend, model, result, fullWidth = false) {
       });
     };
     actions.appendChild(copyBtn);
-    
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'btn btn-sm';
-    exportBtn.textContent = 'Export';
-    exportBtn.onclick = () => exportResult(result, backend, model);
-    actions.appendChild(exportBtn);
-    
+
     card.appendChild(header);
     card.appendChild(metrics);
     card.appendChild(text);
@@ -815,7 +868,6 @@ function displayBatchResults(results) {
         <div class="result-text">${result.text || 'No transcription'}</div>
         <div class="result-actions">
           <button class="btn btn-sm copy-btn">Copy Text</button>
-          <button class="btn btn-sm export-btn">Export</button>
         </div>
       `;
 
@@ -826,9 +878,6 @@ function displayBatchResults(results) {
           showToast('Text copied!', 'success');
         });
       };
-
-      const exportBtn = card.querySelector('.export-btn');
-      exportBtn.onclick = () => exportResult(result, backend, model);
     } else {
       card.innerHTML = `
         <div class="result-header error">
@@ -1541,6 +1590,9 @@ async function startRecording() {
       showToast('Audio recording is not supported in this browser', 'error');
       return;
     }
+
+    // Reset timer to 0:00 before starting
+    updateRecordingTime(0);
 
     // Start recording with time updates
     await state.audioRecorder.startRecording((seconds) => {

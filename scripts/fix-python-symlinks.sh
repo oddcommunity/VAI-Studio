@@ -27,23 +27,40 @@ replace_symlink() {
   if [ -L "$link_path" ]; then
     local target=$(readlink "$link_path")
 
-    # Check if target is an absolute path outside the venv
-    if [[ "$target" = /* ]] && [[ "$target" != "$VENV_DIR"* ]]; then
-      echo "  Replacing symlink: $(basename "$link_path") -> $target"
+    echo "  Found symlink: $(basename "$link_path") -> $target"
 
-      # Check if target exists
-      if [ ! -e "$target" ]; then
-        echo "    WARNING: Target does not exist: $target"
-        return
-      fi
+    # For symlinks, try to follow them to the real file
+    # Use Python to resolve the symlink since readlink -f doesn't exist on macOS
+    local resolved_target
+    if command -v python3 &> /dev/null; then
+      resolved_target=$(python3 -c "import os; print(os.path.realpath('$link_path'))" 2>/dev/null || echo "")
+    else
+      echo "    WARNING: Python3 not found, skipping"
+      return
+    fi
+
+    if [ -z "$resolved_target" ] || [ ! -e "$resolved_target" ]; then
+      echo "    WARNING: Cannot resolve symlink target"
+      return
+    fi
+
+    # Get absolute path of venv for comparison
+    local abs_venv_dir=$(cd "$VENV_DIR" && pwd)
+
+    # Check if the resolved target is outside the venv directory
+    if [[ "$resolved_target" != "$abs_venv_dir"* ]]; then
+      echo "    → External target: $resolved_target"
+      echo "    → Replacing with copy..."
 
       # Remove the symlink
       rm "$link_path"
 
       # Copy the actual binary
-      cp -a "$target" "$link_path"
+      cp -a "$resolved_target" "$link_path"
 
       echo "    ✓ Replaced with copy"
+    else
+      echo "    → Internal link, keeping as-is"
     fi
   fi
 }
@@ -110,10 +127,46 @@ fi
 
 # Show venv info
 echo ""
+echo "Copying Python3 framework files..."
+# Find and copy the Python3 framework library and resources that the binary depends on
+PYTHON3_LIB=$(otool -L "$VENV_DIR/bin/python3" 2>/dev/null | grep "@executable_path/../Python3" | awk '{print $1}' | head -1)
+if [ -n "$PYTHON3_LIB" ]; then
+  echo "  Python binary requires: $PYTHON3_LIB"
+
+  # Find the actual Python3 framework
+  PYTHON3_FRAMEWORK_DIR="/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9"
+
+  if [ -d "$PYTHON3_FRAMEWORK_DIR" ]; then
+    # Copy Python3 framework library
+    echo "  Copying Python3 library..."
+    cp "$PYTHON3_FRAMEWORK_DIR/Python3" "$VENV_DIR/Python3"
+
+    # Copy Resources directory (contains Python.app that python3 binary needs)
+    if [ -d "$PYTHON3_FRAMEWORK_DIR/Resources" ]; then
+      echo "  Copying Resources directory..."
+      cp -R "$PYTHON3_FRAMEWORK_DIR/Resources" "$VENV_DIR/Resources"
+    fi
+
+    # Copy Python standard library if not already present in venv
+    if [ -d "$PYTHON3_FRAMEWORK_DIR/lib/python3.9" ]; then
+      echo "  Copying Python standard library..."
+      # Merge framework stdlib with venv lib
+      cp -R "$PYTHON3_FRAMEWORK_DIR/lib/python3.9"/* "$VENV_DIR/lib/python3.9/" 2>/dev/null || true
+    fi
+
+    echo "  ✓ Python3 framework files copied"
+  else
+    echo "  WARNING: Python3 framework not found at expected location"
+  fi
+else
+  echo "  No Python3 framework dependency found"
+fi
+
+echo ""
 echo "Python venv info:"
 echo "  Python binary: $VENV_DIR/bin/python3"
 if [ -f "$VENV_DIR/bin/python3" ]; then
-  echo "  Python version: $($VENV_DIR/bin/python3 --version)"
+  echo "  Python version: $($VENV_DIR/bin/python3 --version 2>&1 || echo 'N/A')"
   echo "  Binary type: $(file "$VENV_DIR/bin/python3" | cut -d: -f2-)"
 fi
 

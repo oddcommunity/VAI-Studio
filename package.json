@@ -1,12 +1,12 @@
 {
   "name": "vai-studio",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "VAI Studio - Test and compare Speech-to-Text models locally",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "prebuild": "./scripts/prepare-python-bundle.sh",
+    "prebuild": "./scripts/generate-build-info.sh && ./scripts/prepare-python-bundle.sh",
     "build": "npm run prebuild && electron-builder",
     "build:mac": "npm run prebuild && electron-builder --mac",
     "build:win": "npm run prebuild && electron-builder --win",
@@ -37,7 +37,8 @@
     },
     "asarUnpack": [
       "**/*.node",
-      "backends-bundle/**/*"
+      "backends-bundle/**/*",
+      "node_modules/ffmpeg-static/**/*"
     ],
     "files": [
       "electron/**/*",
@@ -61,6 +62,10 @@
       {
         "from": "test_audio.wav",
         "to": "test_audio.wav"
+      },
+      {
+        "from": "scripts/python-wrapper.sh",
+        "to": "scripts/python-wrapper.sh"
       }
     ],
     "mac": {
@@ -82,13 +87,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "assets/icon.ico",
-      "certificateFile": null,
-      "certificatePassword": null,
-      "signingHashAlgorithms": [
-        "sha256"
-      ],
-      "signDlls": true
+      "icon": "assets/icon.ico"
     },
     "linux": {
       "target": [
@@ -113,7 +112,8 @@
   },
   "dependencies": {
     "electron-store": "^11.0.2",
-    "electron-updater": "^6.1.7"
+    "electron-updater": "^6.1.7",
+    "ffmpeg-static": "^5.3.0"
   },
   "devDependencies": {
     "electron": "^39.0.0",

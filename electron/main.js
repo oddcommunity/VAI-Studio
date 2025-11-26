@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const ElectronStore = require('electron-store');
 
 const store = new ElectronStore.default();
@@ -130,19 +131,16 @@ function runPythonCommand(args) {
       pythonPath = '/app/venv/bin/python';
       scriptPath = '/app/backends/runner.py';
     } else if (app.isPackaged) {
-      // Production (packaged app) - use bundled Python from extraResources
-      const platform = process.platform;
-      const pythonExecutable = platform === 'win32' ? 'python.exe' : 'python3';
-      const venvBinDir = platform === 'win32' ? 'Scripts' : 'bin';  // Windows uses Scripts/, Unix uses bin/
-      pythonPath = path.join(process.resourcesPath, 'backends', 'venv', venvBinDir, pythonExecutable);
+      // Production (packaged app) - use python wrapper that sets PYTHONHOME correctly
+      pythonPath = path.join(process.resourcesPath, 'scripts', 'python-wrapper.sh');
       scriptPath = path.join(process.resourcesPath, 'backends', 'runner.py');
-      console.log('[Python] Using bundled Python:', pythonPath);
+      console.log('[Python] Using python wrapper:', pythonPath);
       console.log('[Python] Using bundled scripts:', scriptPath);
     } else {
-      // Development - use local venv
-      pythonPath = path.join(__dirname, '../backends/venv/bin/python3');
+      // Development - use python wrapper script
+      pythonPath = path.join(__dirname, '../scripts/python-wrapper.sh');
       scriptPath = path.join(__dirname, '../backends/runner.py');
-      console.log('[Python] Using development Python:', pythonPath);
+      console.log('[Python] Using development python wrapper:', pythonPath);
     }
 
     // Add ffmpeg to PATH for audio processing
@@ -150,10 +148,13 @@ function runPythonCommand(args) {
     const ffmpegPath = path.join(homeDir, '.local', 'bin');
     const envPath = process.env.PATH ? `${ffmpegPath}:${process.env.PATH}` : ffmpegPath;
 
+    // PYTHONHOME is set by python-wrapper.sh
+    const spawnEnv = { ...process.env, PATH: envPath };
+
     console.log('[Python] Running:', pythonPath, scriptPath, ...args);
 
     const pythonProcess = spawn(pythonPath, [scriptPath, ...args], {
-      env: { ...process.env, PATH: envPath }
+      env: spawnEnv
     });
 
     let stdout = '';
@@ -215,6 +216,118 @@ function runPythonCommand(args) {
   });
 }
 
+// ========================================
+// AUDIO CONVERSION WITH FFMPEG
+// ========================================
+
+/**
+ * Get the path to the bundled FFmpeg binary
+ */
+function getFfmpegPath() {
+  // ffmpeg-static provides the path to the binary
+  // In packaged app, we need to account for asar unpacking
+  try {
+    const ffmpegStatic = require('ffmpeg-static');
+    let ffmpegPath = ffmpegStatic;
+
+    // In packaged app, the path needs to be adjusted for asar unpacking
+    if (app.isPackaged && ffmpegPath.includes('app.asar')) {
+      ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    }
+
+    console.log('[FFmpeg] Path:', ffmpegPath);
+    return ffmpegPath;
+  } catch (e) {
+    console.error('[FFmpeg] Failed to get ffmpeg-static path:', e);
+    return null;
+  }
+}
+
+/**
+ * Convert audio file to WAV format using FFmpeg
+ * This ensures Python only needs to handle WAV files (most compatible)
+ *
+ * @param {string} inputPath - Path to input audio file
+ * @returns {Promise<string>} - Path to converted WAV file (or original if already WAV)
+ */
+function convertToWav(inputPath) {
+  return new Promise((resolve, reject) => {
+    // If already WAV, just return the path
+    const ext = path.extname(inputPath).toLowerCase();
+    if (ext === '.wav') {
+      console.log('[FFmpeg] File is already WAV, skipping conversion');
+      resolve(inputPath);
+      return;
+    }
+
+    const ffmpegPath = getFfmpegPath();
+    if (!ffmpegPath) {
+      reject(new Error('FFmpeg not available'));
+      return;
+    }
+
+    // Check if FFmpeg exists
+    if (!fs.existsSync(ffmpegPath)) {
+      reject(new Error(`FFmpeg binary not found at: ${ffmpegPath}`));
+      return;
+    }
+
+    // Create temp WAV file path
+    const tempDir = os.tmpdir();
+    const baseName = path.basename(inputPath, ext);
+    const tempWavPath = path.join(tempDir, `vai-converted-${Date.now()}-${baseName}.wav`);
+
+    console.log('[FFmpeg] Converting:', inputPath);
+    console.log('[FFmpeg] Output:', tempWavPath);
+
+    // FFmpeg arguments for conversion to WAV
+    // -y: overwrite output
+    // -i: input file
+    // -ar 16000: resample to 16kHz (optimal for Whisper)
+    // -ac 1: mono audio
+    // -acodec pcm_s16le: 16-bit signed little-endian PCM (standard WAV)
+    const args = [
+      '-y',
+      '-i', inputPath,
+      '-ar', '16000',
+      '-ac', '1',
+      '-acodec', 'pcm_s16le',
+      tempWavPath
+    ];
+
+    const ffmpeg = execFile(ffmpegPath, args, { timeout: 120000 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('[FFmpeg] Conversion failed:', error);
+        console.error('[FFmpeg] stderr:', stderr);
+        reject(new Error(`FFmpeg conversion failed: ${error.message}`));
+        return;
+      }
+
+      console.log('[FFmpeg] Conversion successful');
+      resolve(tempWavPath);
+    });
+
+    ffmpeg.on('error', (err) => {
+      console.error('[FFmpeg] Process error:', err);
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Clean up temporary WAV file after transcription
+ */
+function cleanupTempWav(tempPath) {
+  if (tempPath && tempPath.includes('vai-converted-') && fs.existsSync(tempPath)) {
+    try {
+      fs.unlinkSync(tempPath);
+      console.log('[FFmpeg] Cleaned up temp file:', tempPath);
+    } catch (e) {
+      console.warn('[FFmpeg] Failed to cleanup temp file:', e);
+    }
+  }
+}
+
 // IPC Handlers
 
 // List all available backends
@@ -241,17 +354,29 @@ ipcMain.handle('list-models', async (event, { backend }) => {
 
 // Transcribe audio file
 ipcMain.handle('transcribe', async (event, { audioPath, backend, modelName, task }) => {
+  let convertedPath = null;
   try {
-    const args = ['transcribe', backend, audioPath, modelName];
+    // Convert audio to WAV if needed (handles WebM, MP4, OGG, etc.)
+    // This ensures Python only needs to handle WAV files
+    console.log('[Transcribe] Original audio path:', audioPath);
+    convertedPath = await convertToWav(audioPath);
+    console.log('[Transcribe] Using audio path:', convertedPath);
+
+    const args = ['transcribe', backend, convertedPath, modelName];
     if (task) {
       args.push(task);
     }
-    
+
     const result = await runPythonCommand(args);
     return result;
   } catch (error) {
     console.error('Error transcribing:', error);
     return { success: false, error: error.message };
+  } finally {
+    // Clean up temporary WAV file if we created one
+    if (convertedPath && convertedPath !== audioPath) {
+      cleanupTempWav(convertedPath);
+    }
   }
 });
 
@@ -268,13 +393,21 @@ ipcMain.handle('download-model', async (event, { backend, modelName }) => {
 
 // Benchmark model
 ipcMain.handle('benchmark', async (event, { audioPath, backend, modelName, referenceText }) => {
+  let convertedPath = null;
   try {
-    const args = ['benchmark', backend, audioPath, modelName, referenceText];
+    // Convert audio to WAV if needed
+    convertedPath = await convertToWav(audioPath);
+
+    const args = ['benchmark', backend, convertedPath, modelName, referenceText];
     const result = await runPythonCommand(args);
     return result;
   } catch (error) {
     console.error('Error running benchmark:', error);
     return { success: false, error: error.message };
+  } finally {
+    if (convertedPath && convertedPath !== audioPath) {
+      cleanupTempWav(convertedPath);
+    }
   }
 });
 

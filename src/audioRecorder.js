@@ -122,10 +122,10 @@ class AudioRecorder {
    */
   getSupportedMimeType() {
     const types = [
-      'audio/webm;codecs=opus',
+      'audio/mp4',              // Best support in torchaudio
+      'audio/ogg;codecs=opus',  // Good support, native in torchaudio
+      'audio/webm;codecs=opus', // Fallback (requires FFmpeg backend)
       'audio/webm',
-      'audio/ogg;codecs=opus',
-      'audio/mp4',
       'audio/wav'
     ];
 

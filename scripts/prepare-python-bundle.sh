@@ -56,6 +56,15 @@ find "$BUNDLE_DIR/venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/nul
 find "$BUNDLE_DIR/venv" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 find "$BUNDLE_DIR/venv" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 
+# Remove files that cause code signing issues on macOS
+# Static libraries (.a) cannot be properly code signed
+# pyvenv.cfg is not needed at runtime and interferes with signing
+echo "Removing files that cause code signing issues..."
+find "$BUNDLE_DIR/venv" -type f -name "*.a" -delete 2>/dev/null || true
+find "$BUNDLE_DIR/venv" -type d -name "config-*-darwin" -exec rm -rf {} + 2>/dev/null || true
+rm -f "$BUNDLE_DIR/venv/pyvenv.cfg" 2>/dev/null || true
+echo "Code signing cleanup complete."
+
 # Deactivate virtual environment
 deactivate
 
@@ -65,6 +74,13 @@ echo "==================================="
 echo "Fixing symlinks for code signing..."
 echo "==================================="
 "$PROJECT_ROOT/scripts/fix-python-symlinks.sh" "$BUNDLE_DIR/venv"
+
+# Sign Python native extensions (.so files)
+echo ""
+echo "==================================="
+echo "Signing Python native extensions..."
+echo "==================================="
+"$PROJECT_ROOT/scripts/sign-python-extensions.sh" "$BUNDLE_DIR/venv"
 
 echo ""
 echo "==================================="
