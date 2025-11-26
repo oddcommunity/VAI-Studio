@@ -2004,3 +2004,65 @@ a:hover {
   opacity: 0.5;
   pointer-events: none;
 }
+
+/* ===================================== */
+/* Authentication Styles */
+/* ===================================== */
+
+.max-width-500 {
+  max-width: 500px;
+}
+
+.auth-section {
+  padding: 0.5rem 0;
+}
+
+.auth-status-box {
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border-left: 4px solid;
+}
+
+.auth-status-box.success {
+  background-color: #dcfce7;
+  border-color: #16a34a;
+  color: #166534;
+}
+
+.auth-status-box.error {
+  background-color: #fee2e2;
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+.auth-status-box.info {
+  background-color: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+
+.auth-user-info {
+  padding: 1rem;
+  background-color: var(--card-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+#auth-trigger-btn {
+  white-space: nowrap;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.font-semibold {
+  font-weight: 600;
+}

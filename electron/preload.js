@@ -43,6 +43,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
 
+  // User Authentication (Supabase)
+  auth: {
+    signInWithEmail: (email) => ipcRenderer.invoke('auth:sign-in-email', email),
+    signOut: () => ipcRenderer.invoke('auth:sign-out'),
+    getSession: () => ipcRenderer.invoke('auth:get-session'),
+    checkModelAccess: (modelName) => ipcRenderer.invoke('auth:check-model-access', modelName),
+  },
+
   // HuggingFace Authentication
   saveHFToken: (token) => ipcRenderer.invoke('save-hf-token', token),
   getHFToken: () => ipcRenderer.invoke('get-hf-token'),

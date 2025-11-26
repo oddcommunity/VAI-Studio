@@ -7,6 +7,7 @@ const ElectronStore = require('electron-store');
 
 // Initialize Odd-Core services
 const { getLogger } = require('./odd-core-integration');
+const { authService } = require('./auth-service');
 const logger = getLogger();
 
 const store = new ElectronStore.default();
@@ -105,6 +106,11 @@ app.whenReady().then(() => {
         version: info.version
       });
     }
+  });
+
+  // Initialize authentication service
+  authService.initialize().catch(err => {
+    logger.error('Failed to initialize auth service', { error: err.message });
   });
 
   createWindow();
@@ -591,6 +597,58 @@ function formatVTTTime(seconds) {
 }
 
 console.log('Electron main process ready');
+
+// ========================================
+// USER AUTHENTICATION (SUPABASE)
+// ========================================
+
+// Sign in with email (OTP)
+ipcMain.handle('auth:sign-in-email', async (event, email) => {
+  try {
+    logger.info('Sign in request', { email });
+    const result = await authService.signInWithEmail(email);
+    return result;
+  } catch (error) {
+    logger.error('Sign in failed', { email, error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Sign out
+ipcMain.handle('auth:sign-out', async () => {
+  try {
+    logger.info('Sign out request');
+    const result = await authService.signOut();
+    return result;
+  } catch (error) {
+    logger.error('Sign out failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Get current session
+ipcMain.handle('auth:get-session', async () => {
+  try {
+    const result = await authService.getSession();
+    return result;
+  } catch (error) {
+    logger.error('Get session failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Check model access
+ipcMain.handle('auth:check-model-access', async (event, modelName) => {
+  try {
+    const hasAccess = authService.hasModelAccess(modelName);
+    return { success: true, hasAccess };
+  } catch (error) {
+    logger.error('Check model access failed', { modelName, error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+logger.info('User authentication system initialized');
 
 // ========================================
 // HUGGINGFACE OAUTH AUTHENTICATION

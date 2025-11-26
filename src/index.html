@@ -22,6 +22,9 @@
         <p>Test and compare local speech-to-text models</p>
       </div>
       <div class="header-right">
+        <button id="auth-trigger-btn" class="btn btn-sm btn-primary">
+          Sign In
+        </button>
         <div class="version-info">
           <span id="app-version" class="app-version">v3.0.1</span>
           <span id="build-date" class="version-date"></span>
@@ -208,6 +211,54 @@
       <div class="modal-footer">
         <button id="refresh-models" class="btn btn-sm">🔄 Refresh</button>
         <button id="close-model-manager-footer" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Authentication Modal -->
+  <div id="auth-modal" class="modal">
+    <div class="modal-content max-width-500">
+      <div class="modal-header">
+        <h2>Sign In to VAI Studio</h2>
+        <button id="close-auth-modal" class="modal-close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="auth-section">
+          <p class="text-sm color-muted margin-bottom-1">
+            Sign in to get instant access to Whisper Tiny model. For additional models, you'll need a HuggingFace token.
+          </p>
+
+          <div id="auth-status" class="auth-status-box hidden">
+            <p id="auth-status-text" class="text-sm"></p>
+          </div>
+
+          <div id="auth-form">
+            <label class="settings-label">
+              Email Address
+              <input type="email" id="auth-email-input" class="select-input" placeholder="your@email.com">
+            </label>
+
+            <button id="auth-sign-in-btn" class="btn btn-success width-full margin-top-1">
+              Send Magic Link
+            </button>
+
+            <p class="text-sm color-muted margin-top-1 text-center">
+              We'll send you a magic link to sign in. No password required.
+            </p>
+          </div>
+
+          <div id="auth-session" class="hidden">
+            <div class="auth-user-info">
+              <p class="text-sm margin-bottom-05">Signed in as:</p>
+              <p id="auth-user-email" class="font-semibold"></p>
+            </div>
+
+            <button id="auth-sign-out-btn" class="btn color-error width-full margin-top-1">
+              Sign Out
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
