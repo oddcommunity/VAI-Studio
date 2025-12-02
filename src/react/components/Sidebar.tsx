@@ -18,6 +18,8 @@ import {
   SettingsIcon,
   FolderIcon,
 } from './Icons'
+import { BatchFilesList } from './BatchFilesList'
+import type { BatchFile } from '../types'
 
 export interface Model {
   id: string
@@ -37,6 +39,9 @@ export interface SidebarProps {
   compareMode?: boolean
   onCompareModeChange?: (enabled: boolean) => void
   isTranscribing?: boolean
+  batchFiles?: BatchFile[]
+  onRemoveBatchFile?: (index: number) => void
+  onClearBatchFiles?: () => void
 }
 
 export function Sidebar({
@@ -52,6 +57,9 @@ export function Sidebar({
   compareMode = false,
   onCompareModeChange,
   isTranscribing = false,
+  batchFiles = [],
+  onRemoveBatchFile,
+  onClearBatchFiles,
 }: SidebarProps) {
   const theme = useTheme()
   const [isMounted, setIsMounted] = useState(false)
@@ -189,6 +197,16 @@ export function Sidebar({
               </Button>
             </YStack>
           </YStack>
+
+          {/* Batch Files List */}
+          {batchFiles.length > 0 && onRemoveBatchFile && onClearBatchFiles && (
+            <BatchFilesList
+              files={batchFiles}
+              onRemoveFile={onRemoveBatchFile}
+              onClearAll={onClearBatchFiles}
+              maxHeight={150}
+            />
+          )}
 
           {/* Model Section */}
           <YStack gap={12}>

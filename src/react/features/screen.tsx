@@ -34,7 +34,10 @@ export function VAIStudioFeatureScreen({
     setIsTranscribing,
     isRecording,
     setIsRecording,
+    batchFiles,
     addBatchFiles,
+    removeBatchFile,
+    clearBatchFiles,
     transcriptionResults,
     setTranscriptionResults,
     setUIState,
@@ -242,6 +245,9 @@ export function VAIStudioFeatureScreen({
         isTranscribing={isTranscribing}
         version="v3.0.1"
         releaseDate="Nov 26, 2025"
+        batchFiles={batchFiles}
+        onRemoveBatchFile={removeBatchFile}
+        onClearBatchFiles={clearBatchFiles}
       >
         {hasResults ? (
           <ResultsPanel

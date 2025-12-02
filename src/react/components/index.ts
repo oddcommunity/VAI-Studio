@@ -64,3 +64,6 @@ export { AuthModal } from './AuthModal'
 
 // System
 export { UpdateBanner, UpdateNotification } from './UpdateBanner'
+
+// Batch processing
+export { BatchFilesList } from './BatchFilesList'
