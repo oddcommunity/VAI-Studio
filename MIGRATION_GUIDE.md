@@ -514,6 +514,283 @@ export async function downloadModel(backend: string, modelName: string): Promise
 
 ---
 
+## State Management
+
+### Global State Shape (from app.js)
+
+```typescript
+interface AppState {
+  // Models & Backends
+  backends: Record<string, Backend>;
+  selectedBackend: string | null;
+
+  // File Selection
+  selectedFile: string | null;
+  batchMode: boolean;
+  batchFiles: BatchFile[];
+  batchProcessing: boolean;
+
+  // Transcription
+  comparisonMode: boolean;
+  activeTranscriptions: number;
+
+  // Recording
+  isRecording: boolean;
+  recordedAudio: RecordedAudio | null;
+  audioRecorder: AudioRecorder | null;
+  currentAudioPlayer: HTMLAudioElement | null;
+}
+
+interface BatchFile {
+  path: string;
+  name: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+}
+
+interface RecordedAudio {
+  blob?: Blob;
+  mimeType: string;
+  duration: number;
+  filePath: string;
+  fileName: string;
+}
+```
+
+### Settings State (persisted to localStorage)
+
+```typescript
+interface UserSettings {
+  devicePreference: 'auto' | 'cpu' | 'cuda';
+  quantization: 'auto' | 'fp32' | 'fp16' | 'int8';
+  defaultLanguage: string;
+  enableTimestamps: boolean;
+  enableWordTimestamps: boolean;
+  modelCachePath: string;
+  exportPath: string;
+  autoScroll: boolean;
+  showNotifications: boolean;
+  fontSize: 'small' | 'medium' | 'large';
+}
+```
+
+### Recommended State Management for React
+
+- **Zustand** or **Jotai** for global state (lightweight, works well with Tamagui)
+- **React Query / TanStack Query** for server state (API calls, caching)
+- **localStorage** for settings persistence (same as vanilla)
+
+---
+
+## User Flows to Preserve
+
+### 1. Single File Transcription
+```
+Select File → Choose Model → Click Transcribe → View Result → Copy/Export
+```
+
+### 2. Batch Transcription
+```
+Add Multiple Files → Choose Model → Click Batch Transcribe → View Progress → View All Results
+```
+
+### 3. Voice Recording
+```
+Click Record → Recording Indicator Shows → Stop → Preview/Play → Use or Discard → Transcribe
+```
+
+### 4. Model Management
+```
+Open Model Manager → View Available/Installed → Download Model → Progress in Downloads Tab → Model Ready
+```
+
+### 5. Comparison Mode
+```
+Enable Comparison → Select 2-3 Models → Transcribe → View Side-by-Side Results
+```
+
+### 6. Settings
+```
+Open Settings → Configure Device/Language/Paths → Save → Settings Persist
+```
+
+### 7. HuggingFace Authentication
+```
+Open Settings → Enter HF Token → Test Token → Save Token → Gated Models Accessible
+```
+
+### 8. Auto-Update
+```
+Update Available → Banner Shows → Click Reload → App Restarts with New Version
+```
+
+---
+
+## Electron IPC Contract
+
+### Preload Script Exposed APIs
+
+The React app must maintain compatibility with these IPC channels:
+
+```typescript
+// electron/preload.js exposes these to window.electronAPI
+
+interface ElectronAPI {
+  // File Operations
+  selectAudioFile(): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+  selectMultipleAudioFiles(): Promise<{ success: boolean; canceled?: boolean; filePaths?: string[] }>;
+  selectFromRecordings(): Promise<{ success: boolean; canceled?: boolean; filePath?: string; fileName?: string; duration?: number }>;
+  getFileInfo(filePath: string): Promise<{ success: boolean; fileName?: string; fileSizeMB?: string }>;
+  showItemInFolder(filePath: string): void;
+  saveRecording(data: { blob: ArrayBuffer; mimeType: string; duration: number }): Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }>;
+
+  // Transcription
+  listBackends(): Promise<{ success: boolean; backends?: Record<string, Backend>; error?: string }>;
+  transcribe(options: TranscribeOptions): Promise<TranscribeResult>;
+  downloadModel(backend: string, modelName: string): Promise<{ success: boolean; error?: string }>;
+  exportResult(result: any, format: string, filePath: string): Promise<{ success: boolean; error?: string }>;
+  saveDialog(defaultName: string, filters: any[]): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+
+  // HuggingFace Auth
+  getHFToken(): Promise<{ success: boolean; token?: string }>;
+  saveHFToken(token: string): Promise<{ success: boolean; error?: string }>;
+  testHFToken(token: string): Promise<{ success: boolean; valid?: boolean; username?: string; error?: string }>;
+  clearHFToken(): Promise<{ success: boolean; error?: string }>;
+  openHFTokenPage(): Promise<void>;
+
+  // Supabase Auth (new)
+  auth: {
+    signInWithEmail(email: string): Promise<{ success: boolean; error?: string }>;
+    signOut(): Promise<{ success: boolean; error?: string }>;
+    getSession(): Promise<{ success: boolean; session?: any; error?: string }>;
+    checkModelAccess(modelName: string): Promise<{ success: boolean; hasAccess?: boolean; error?: string }>;
+  };
+
+  // App Updates
+  onUpdateReady(callback: (updateInfo: { version: string }) => void): void;
+  restartToUpdate(): void;
+
+  // Progress Events
+  onProgress(callback: (data: { progress: number; message: string; stage?: string }) => void): void;
+
+  // External Links
+  openExternal(url: string): Promise<void>;
+  openLicenseFile(): Promise<void>;
+}
+```
+
+---
+
+## Key Files Reference
+
+| File | Purpose | Migration Priority |
+|------|---------|-------------------|
+| `src/app.js` | Main app logic, state, event handlers | HIGH - Extract to services |
+| `src/styles.css` | All styling (2000+ lines) | HIGH - Convert to Tamagui theme |
+| `src/index.html` | DOM structure, modals | HIGH - Convert to React components |
+| `src/audioRecorder.js` | Audio recording class | MEDIUM - Wrap in hook |
+| `src/components/ModelSelector.js` | Custom dropdown component | MEDIUM - Replace with Tamagui Select |
+| `electron/main.js` | Electron main process | LOW - Keep as-is |
+| `electron/preload.js` | IPC bridge | LOW - Keep as-is |
+| `electron/auth-service.js` | Supabase auth | LOW - Keep as-is, consume from React |
+
+---
+
+## Gotchas & Edge Cases
+
+### 1. File Paths in Electron
+- Audio playback uses `file://` protocol
+- Paths may have spaces - always handle properly
+- Windows vs Mac/Linux path separators
+
+### 2. Recording Blob Handling
+```typescript
+// Must convert Blob to ArrayBuffer for IPC
+const arrayBuffer = await new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error('Failed to read blob'));
+  reader.readAsArrayBuffer(result.blob);
+});
+```
+
+### 3. Progress Events
+- Progress callback is registered once on init
+- Comparison mode adjusts progress per-model
+- Must handle progress for downloads vs transcription differently
+
+### 4. Model Selector
+- Custom component with search, grouping by backend
+- Stores value as JSON string: `{"backend": "whisper", "model": "tiny"}`
+- Multiple instances for comparison mode
+
+### 5. Modal Z-Index
+- Modals: 10000
+- Update banner: 10001
+- Toasts: 9999
+
+### 6. CSP (Content Security Policy)
+```html
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'self' file:;">
+```
+React build must comply with this CSP (no inline scripts/styles).
+
+---
+
+## Testing Checklist
+
+After migration, verify these work:
+
+- [ ] Select audio file from system
+- [ ] Select from recordings folder
+- [ ] Record new audio
+- [ ] Play back recorded audio
+- [ ] Discard recording
+- [ ] Single model transcription
+- [ ] Comparison mode (2-3 models)
+- [ ] Batch transcription
+- [ ] Progress bar updates
+- [ ] Copy transcription text
+- [ ] Export to TXT/JSON/SRT/VTT
+- [ ] Model manager - view available
+- [ ] Model manager - view installed
+- [ ] Model download with progress
+- [ ] Settings - save/load
+- [ ] Settings - HuggingFace token test/save/clear
+- [ ] Auto-update banner
+- [ ] Toast notifications
+- [ ] All modals open/close (Settings, Model Manager, Auth)
+- [ ] Keyboard shortcuts (Escape to close modals)
+- [ ] External links open in browser
+
+---
+
+## Odd-Core Integration
+
+Import types from `@odd-core/types`:
+
+```typescript
+import type {
+  Profile,
+  AppLicense,
+  LicenseKind,
+  AppCode,
+  // ... etc
+} from '@odd-core/types';
+```
+
+For authentication, use `@odd-core/auth`:
+
+```typescript
+import { AuthManager } from '@odd-core/auth';
+
+const authManager = new AuthManager({
+  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseKey: process.env.SUPABASE_ANON_KEY
+});
+```
+
+---
+
 ## Notes
 
 - All colors use dark theme (slate/gray palette)
@@ -522,3 +799,5 @@ export async function downloadModel(backend: string, modelName: string): Promise
 - Animations are subtle and quick (0.15s - 0.4s)
 - Toast notifications appear top-right
 - Progress bars use green gradient fill
+- Header is draggable (Electron window drag region)
+- Buttons in header are non-draggable (`-webkit-app-region: no-drag`)
