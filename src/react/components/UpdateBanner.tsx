@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { XStack, Text, Button, styled, AnimatePresence } from 'tamagui'
 import { Download, X, RefreshCw } from '@tamagui/lucide-icons'
 import { electronBridge } from '../services/electron.bridge'
@@ -15,7 +15,6 @@ const BannerContainer = styled(XStack, {
   justifyContent: 'center',
   gap: 16,
   zIndex: 100001,
-  animation: 'quick',
   enterStyle: {
     opacity: 0,
     y: -50,

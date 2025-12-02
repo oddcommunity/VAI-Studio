@@ -1,4 +1,4 @@
-import React from 'react'
+// WelcomeScreen component
 import { YStack, XStack, Text, H1 } from 'tamagui'
 import { CheckCircleIcon } from './Icons'
 

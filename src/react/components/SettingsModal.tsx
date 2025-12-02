@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   YStack,
   XStack,
@@ -6,11 +6,9 @@ import {
   Button,
   Select,
   Checkbox,
-  Input,
   Sheet,
-  useTheme,
 } from 'tamagui'
-import { X, Settings, Check, ChevronDown, RotateCcw, Save, Key } from '@tamagui/lucide-icons'
+import { X, Settings, Check, ChevronDown, RotateCcw, Save } from '@tamagui/lucide-icons'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { useToastStore } from '../stores/useToastStore'
 import type { UserSettings } from '../types'
@@ -148,7 +146,6 @@ function CheckboxRow({
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const theme = useTheme()
   const settings = useSettingsStore()
   const { showToast } = useToastStore()
 
@@ -217,7 +214,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     <Sheet
       modal
       open={open}
-      onOpenChange={(isOpen) => !isOpen && onClose()}
+      onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
       snapPoints={[90]}
       dismissOnSnapToBottom
       zIndex={100000}

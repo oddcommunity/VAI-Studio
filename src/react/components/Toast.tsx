@@ -28,8 +28,6 @@ const ToastItem = styled(XStack, {
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.3,
   shadowRadius: 12,
-  // @ts-expect-error - Tamagui animation prop type issue
-  animation: 'quick',
   enterStyle: {
     opacity: 0,
     x: 50,

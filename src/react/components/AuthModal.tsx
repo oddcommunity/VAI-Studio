@@ -12,7 +12,6 @@ import {
   X,
   Key,
   CheckCircle,
-  AlertCircle,
   ExternalLink,
   LogOut,
   User,
@@ -162,7 +161,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     <Sheet
       modal
       open={open}
-      onOpenChange={(isOpen) => !isOpen && onClose()}
+      onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
       snapPoints={[70]}
       dismissOnSnapToBottom
       zIndex={100000}

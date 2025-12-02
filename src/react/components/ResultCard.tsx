@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
 import {
   Copy,
@@ -20,7 +20,6 @@ const Card = styled(YStack, {
   borderWidth: 1,
   borderColor: '$secondary3',
   overflow: 'hidden',
-  animation: 'quick',
   enterStyle: {
     opacity: 0,
     y: 10,

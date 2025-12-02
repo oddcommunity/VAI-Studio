@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { TamaguiProvider, Theme, YStack } from 'tamagui'
 import { VAIStudioFeatureScreen } from './features/screen'
 import { config } from './tamagui.config'
@@ -41,7 +41,10 @@ export function App() {
   const handleOpenModelManager = useCallback(() => setModelManagerOpen(true), [])
   const handleCloseModelManager = useCallback(() => setModelManagerOpen(false), [])
 
+  // Auth modal can be triggered from settings or other UI
   const handleOpenAuth = useCallback(() => setAuthOpen(true), [])
+  // Expose for future use
+  void handleOpenAuth
   const handleCloseAuth = useCallback(() => setAuthOpen(false), [])
 
   return (

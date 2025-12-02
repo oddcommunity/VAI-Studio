@@ -1,7 +1,7 @@
-import React, { ReactNode } from 'react'
+import { ReactNode } from 'react'
 import { XStack, YStack, ScrollView } from 'tamagui'
-import { Sidebar, SidebarProps, Model } from './Sidebar'
-import { WelcomeScreen, WelcomeScreenProps } from './WelcomeScreen'
+import { Sidebar, Model } from './Sidebar'
+import { WelcomeScreen } from './WelcomeScreen'
 
 export interface VAIStudioProps {
   /** Available models for selection */

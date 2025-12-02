@@ -13,7 +13,6 @@ import type { TranscribeOptions, TranscribeResult } from '../types'
 export function useTranscription() {
   const {
     selectedFile,
-    comparisonMode,
     batchFiles,
     setIsTranscribing,
     setTranscriptionResults,
@@ -47,7 +46,9 @@ export function useTranscription() {
 
     try {
       for (let i = 0; i < models.length; i++) {
-        const { backend, model } = models[i]
+        const modelEntry = models[i]
+        if (!modelEntry) continue
+        const { backend, model } = modelEntry
 
         // Update progress for comparison mode
         const progressPerModel = 100 / models.length
@@ -127,6 +128,7 @@ export function useTranscription() {
 
       for (let i = 0; i < batchFiles.length; i++) {
         const file = batchFiles[i]
+        if (!file) continue
 
         updateBatchFileStatus(i, 'processing')
         setProgress(

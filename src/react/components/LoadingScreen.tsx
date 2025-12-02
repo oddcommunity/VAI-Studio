@@ -1,4 +1,4 @@
-import React from 'react'
+// LoadingScreen component
 import { YStack, Text, Progress, Spinner, styled } from 'tamagui'
 import { useAppStore } from '../stores/useAppStore'
 
@@ -78,10 +78,7 @@ export function LoadingScreen({ message, progress, stage }: LoadingScreenProps) 
         {displayProgress > 0 && (
           <YStack width="100%" gap={8}>
             <Progress value={displayProgress} max={100} backgroundColor="$secondary4">
-              <Progress.Indicator
-                backgroundColor="$primary6"
-                animation="quick"
-              />
+              <Progress.Indicator backgroundColor="$primary6" />
             </Progress>
             <Text
               fontSize={13}

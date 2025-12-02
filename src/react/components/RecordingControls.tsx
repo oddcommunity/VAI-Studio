@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { YStack, XStack, Text, Button, styled } from 'tamagui'
-import { Mic, Square, Play, Pause, Trash2, Check } from '@tamagui/lucide-icons'
+import { Mic, Square, Trash2, Check } from '@tamagui/lucide-icons'
 import { useAppStore } from '../stores/useAppStore'
 import { useToastStore } from '../stores/useToastStore'
 
@@ -59,7 +59,6 @@ const WaveformBar = styled(YStack, {
   width: 4,
   backgroundColor: '$primary6',
   borderRadius: 2,
-  animation: 'bouncy',
 })
 
 interface RecordingControlsProps {
@@ -117,7 +116,6 @@ export function RecordingControls({
   visible,
 }: RecordingControlsProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
 
   // Timer for recording duration
   useEffect(() => {
@@ -167,7 +165,6 @@ export function RecordingControls({
               height={8}
               borderRadius={4}
               backgroundColor="hsl(0, 84%, 60%)"
-              animation="bouncy"
             />
             <Text fontSize={13} color="hsl(0, 84%, 60%)">
               Recording in progress

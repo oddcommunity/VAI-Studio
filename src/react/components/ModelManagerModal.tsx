@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   YStack,
   XStack,
@@ -14,17 +14,15 @@ import {
   X,
   FolderOpen,
   Download,
-  Trash2,
   CheckCircle,
   HardDrive,
   Cpu,
-  AlertCircle,
   RefreshCw,
 } from '@tamagui/lucide-icons'
 import { useAppStore } from '../stores/useAppStore'
 import { useToastStore } from '../stores/useToastStore'
 import { modelService } from '../services/model.service'
-import type { Backend, Model } from '../types'
+import type { Model } from '../types'
 
 const ModelCard = styled(YStack, {
   backgroundColor: '$secondary3',
@@ -108,14 +106,18 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
 
       try {
         await modelService.downloadModel(backend, modelName, (progress, message) => {
-          setDownloads((prev) => ({
-            ...prev,
-            [downloadKey]: {
-              ...prev[downloadKey],
-              progress,
-              message,
-            },
-          }))
+          setDownloads((prev) => {
+            const existing = prev[downloadKey]
+            if (!existing) return prev
+            return {
+              ...prev,
+              [downloadKey]: {
+                ...existing,
+                progress,
+                message,
+              },
+            }
+          })
         })
 
         setDownloads((prev) => {
@@ -173,7 +175,7 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
     <Sheet
       modal
       open={open}
-      onOpenChange={(isOpen) => !isOpen && onClose()}
+      onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
       snapPoints={[85]}
       dismissOnSnapToBottom
       zIndex={100000}
@@ -418,7 +420,7 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
                               max={100}
                               backgroundColor="$secondary4"
                             >
-                              <Progress.Indicator backgroundColor="$primary6" animation="quick" />
+                              <Progress.Indicator backgroundColor="$primary6" />
                             </Progress>
                             <Text fontSize={11} color="$secondary6">
                               {downloads[downloadKey].message}
@@ -465,7 +467,7 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
 
                       <YStack gap={8}>
                         <Progress value={download.progress} max={100} backgroundColor="$secondary4">
-                          <Progress.Indicator backgroundColor="$primary6" animation="quick" />
+                          <Progress.Indicator backgroundColor="$primary6" />
                         </Progress>
                         <Text fontSize={11} color="$secondary6">
                           {download.message}

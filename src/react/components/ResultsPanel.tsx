@@ -1,6 +1,6 @@
-import React from 'react'
+// ResultsPanel component
 import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
-import { FileAudio, Trash2, LayoutGrid, List } from '@tamagui/lucide-icons'
+import { FileAudio, Trash2, LayoutGrid } from '@tamagui/lucide-icons'
 import { ResultCard } from './ResultCard'
 import type { TranscribeResult } from '../types'
 

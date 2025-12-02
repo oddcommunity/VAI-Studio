@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { modelService } from '@services/model.service'
 import { useAppStore } from '@stores/useAppStore'
 import { useToastStore } from '@stores/useToastStore'
-import type { Backend } from '../types'
+// Types imported from local types file
 
 export function useModels() {
   const [loading, setLoading] = useState(true)
