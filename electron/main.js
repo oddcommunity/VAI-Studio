@@ -41,7 +41,7 @@ function createWindow() {
     width: 1400,
     height: 900,
     titleBarStyle: 'hiddenInset',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#0f172a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -49,7 +49,27 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
+  // Load React app (different paths for dev vs production)
+  if (app.isPackaged) {
+    // Production: load from dist-react
+    mainWindow.loadFile(path.join(__dirname, '../dist-react/index.html'));
+  } else {
+    // Development: load from Vite dev server or built files
+    // First try Vite dev server, fallback to built files
+    const devServerUrl = 'http://localhost:3000';
+    const distHtmlPath = path.join(__dirname, '../dist-react/index.html');
+
+    if (fs.existsSync(distHtmlPath)) {
+      // Load from built files
+      mainWindow.loadFile(distHtmlPath);
+    } else {
+      // Try dev server (when running npm run dev:react)
+      mainWindow.loadURL(devServerUrl).catch(() => {
+        // Fallback to vanilla JS if React not built yet
+        mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
+      });
+    }
+  }
 
   // Open DevTools only in development (--dev flag or when not packaged)
   if (process.argv.includes('--dev') || !app.isPackaged) {

@@ -1,0 +1,62 @@
+/**
+ * Global Styles for VAI Studio React App
+ * Minimal global styles - most styling handled by Tamagui
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Electron-specific: Make header draggable */
+.electron-drag-region {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.electron-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(215, 15%, 15%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(215, 15%, 35%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(215, 15%, 45%);
+}
+
+/* Selection color */
+::selection {
+  background-color: hsl(215, 83%, 50%);
+  color: white;
+}

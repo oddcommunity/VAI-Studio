@@ -6,12 +6,15 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "dev:react": "vite",
+    "build:react": "vite build",
+    "preview": "vite preview",
     "prebuild": "./scripts/generate-build-info.sh && ./scripts/prepare-python-bundle.sh",
-    "build": "npm run prebuild && electron-builder",
-    "build:mac": "npm run prebuild && electron-builder --mac",
-    "build:win": "npm run prebuild && electron-builder --win",
-    "build:linux": "npm run prebuild && electron-builder --linux",
-    "build:all": "npm run prebuild && electron-builder --mac --win --linux"
+    "build": "npm run build:react && npm run prebuild && electron-builder",
+    "build:mac": "npm run build:react && npm run prebuild && electron-builder --mac",
+    "build:win": "npm run build:react && npm run prebuild && electron-builder --win",
+    "build:linux": "npm run build:react && npm run prebuild && electron-builder --linux",
+    "build:all": "npm run build:react && npm run prebuild && electron-builder --mac --win --linux"
   },
   "keywords": [
     "speech-to-text",
@@ -42,7 +45,7 @@
     ],
     "files": [
       "electron/**/*",
-      "src/**/*",
+      "dist-react/**/*",
       "backends/**/*.py",
       "!backends/__pycache__",
       "!backends/*.pyc",
@@ -124,10 +127,23 @@
     "@odd-core/validation": "link:/root/odd-core/packages/validation",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.1.7",
-    "ffmpeg-static": "^5.3.0"
+    "ffmpeg-static": "^5.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tamagui": "^1.110.0",
+    "@tamagui/config": "^1.110.0",
+    "@tamagui/shorthands": "^1.110.0",
+    "@tamagui/themes": "^1.110.0",
+    "@tamagui/react-native-media-driver": "^1.110.0",
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
     "electron": "^39.0.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
   }
 }
