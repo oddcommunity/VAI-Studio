@@ -4,7 +4,7 @@
  */
 
 import { electronBridge } from './electron.bridge'
-import type { TranscribeOptions, TranscribeResult } from '@types/index'
+import type { TranscribeOptions, TranscribeResult } from '../types'
 
 export class TranscriptionService {
   /**

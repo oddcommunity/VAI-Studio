@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 import { settingsService } from '@services/settings.service'
-import type { UserSettings } from '@types/index'
+import type { UserSettings } from '../types'
 
 interface SettingsState extends UserSettings {
   // Actions

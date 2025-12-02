@@ -8,7 +8,7 @@ import { transcriptionService } from '@services/transcription.service'
 import { useAppStore } from '@stores/useAppStore'
 import { useSettingsStore } from '@stores/useSettingsStore'
 import { useToastStore } from '@stores/useToastStore'
-import type { TranscribeOptions, TranscribeResult } from '@types/index'
+import type { TranscribeOptions, TranscribeResult } from '../types'
 
 export function useTranscription() {
   const {

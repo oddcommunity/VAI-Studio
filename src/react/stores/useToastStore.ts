@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { ToastMessage, ToastType } from '@types/index'
+import type { ToastMessage, ToastType } from '../types'
 
 interface ToastState {
   toasts: ToastMessage[]

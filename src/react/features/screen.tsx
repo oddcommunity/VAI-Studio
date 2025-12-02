@@ -1,13 +1,25 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { Theme } from 'tamagui'
 import { VAIStudioScreen } from '../components/VAIStudio'
+import { ResultsPanel } from '../components/ResultsPanel'
+import { WelcomeScreen } from '../components/WelcomeScreen'
 import { useAppStore } from '../stores/useAppStore'
 import { useToastStore } from '../stores/useToastStore'
 import { audioService } from '../services/audio.service'
 import { transcriptionService } from '../services/transcription.service'
 import { modelService } from '../services/model.service'
+import { electronBridge } from '../services/electron.bridge'
+import type { TranscriptionResultItem } from '../components/ResultsPanel'
 
-export function VAIStudioFeatureScreen() {
+interface VAIStudioFeatureScreenProps {
+  onAdvancedSettings?: () => void
+  onManageModels?: () => void
+}
+
+export function VAIStudioFeatureScreen({
+  onAdvancedSettings,
+  onManageModels,
+}: VAIStudioFeatureScreenProps) {
   // Global state
   const {
     backends,
@@ -22,8 +34,11 @@ export function VAIStudioFeatureScreen() {
     setIsTranscribing,
     isRecording,
     setIsRecording,
-    batchFiles,
     addBatchFiles,
+    transcriptionResults,
+    setTranscriptionResults,
+    setUIState,
+    setProgress,
   } = useAppStore()
 
   const { showToast } = useToastStore()
@@ -92,7 +107,6 @@ export function VAIStudioFeatureScreen() {
     if (isRecording) {
       // Stop recording
       try {
-        // Recording stop logic would go here
         setIsRecording(false)
         showToast('Recording stopped', 'success', 2000)
       } catch (error) {
@@ -103,7 +117,6 @@ export function VAIStudioFeatureScreen() {
       try {
         setIsRecording(true)
         showToast('Recording started', 'info', 2000)
-        // Recording start logic would go here
       } catch (error) {
         setIsRecording(false)
         showToast('Failed to start recording', 'error', 3000)
@@ -124,6 +137,8 @@ export function VAIStudioFeatureScreen() {
     }
 
     setIsTranscribing(true)
+    setUIState({ loading: true, welcome: false })
+    setProgress(0, 'Starting transcription...', 'transcribing')
 
     try {
       const { backend, model } = JSON.parse(selectedModel)
@@ -135,34 +150,80 @@ export function VAIStudioFeatureScreen() {
       })
 
       if (result.success) {
+        // Add result to the results array
+        const newResult: TranscriptionResultItem = {
+          backend,
+          model,
+          result,
+        }
+
+        setTranscriptionResults([...transcriptionResults, newResult])
+        setUIState({ results: true, loading: false })
         showToast('Transcription complete!', 'success', 3000)
-        console.log('Transcription result:', result)
-        // TODO: Display result in main content area
       } else {
         showToast(result.error || 'Transcription failed', 'error', 5000)
+        setUIState({ loading: false })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Transcription failed'
       showToast(message, 'error', 5000)
       console.error('Transcription error:', error)
+      setUIState({ loading: false })
     } finally {
       setIsTranscribing(false)
+      setProgress(0, '', undefined)
     }
-  }, [selectedFile, selectedModel, setIsTranscribing, showToast])
+  }, [
+    selectedFile,
+    selectedModel,
+    setIsTranscribing,
+    setUIState,
+    setProgress,
+    transcriptionResults,
+    setTranscriptionResults,
+    showToast,
+  ])
+
+  // Clear results handler
+  const handleClearResults = useCallback(() => {
+    setTranscriptionResults([])
+    setUIState({ welcome: true, results: false })
+    showToast('Results cleared', 'info', 2000)
+  }, [setTranscriptionResults, setUIState, showToast])
+
+  // Export result handler
+  const handleExportResult = useCallback(
+    async (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt') => {
+      try {
+        const defaultName = `transcription_${result.model}.${format}`
+        const dialogResult = await electronBridge.saveDialog(defaultName, [
+          { name: format.toUpperCase(), extensions: [format] },
+        ])
+
+        if (dialogResult.success && !dialogResult.canceled && dialogResult.filePath) {
+          await electronBridge.exportResult(result.result, format, dialogResult.filePath)
+          showToast(`Exported to ${format.toUpperCase()}`, 'success', 2000)
+        }
+      } catch (error) {
+        showToast('Failed to export', 'error', 3000)
+        console.error('Export error:', error)
+      }
+    },
+    [showToast]
+  )
 
   // Settings handler
   const handleAdvancedSettings = useCallback(() => {
-    // TODO: Open settings modal
-    console.log('Advanced settings pressed')
-    showToast('Settings coming soon', 'info', 2000)
-  }, [showToast])
+    onAdvancedSettings?.()
+  }, [onAdvancedSettings])
 
   // Model manager handler
   const handleManageModels = useCallback(() => {
-    // TODO: Open model manager modal
-    console.log('Manage models pressed')
-    showToast('Model manager coming soon', 'info', 2000)
-  }, [showToast])
+    onManageModels?.()
+  }, [onManageModels])
+
+  // Determine what to show in the main content area
+  const hasResults = transcriptionResults.length > 0
 
   return (
     <Theme name="vai_dark">
@@ -181,7 +242,19 @@ export function VAIStudioFeatureScreen() {
         isTranscribing={isTranscribing}
         version="v3.0.1"
         releaseDate="Nov 26, 2025"
-      />
+      >
+        {hasResults ? (
+          <ResultsPanel
+            results={transcriptionResults}
+            comparisonMode={comparisonMode}
+            onClearResults={handleClearResults}
+            onExport={handleExportResult}
+            selectedFile={selectedFile ?? undefined}
+          />
+        ) : (
+          <WelcomeScreen version="v3.0.1" releaseDate="Nov 26, 2025" />
+        )}
+      </VAIStudioScreen>
     </Theme>
   )
 }

@@ -26,8 +26,12 @@ export default defineConfig({
       '@stores': path.resolve(__dirname, './src/react/stores'),
       '@hooks': path.resolve(__dirname, './src/react/hooks'),
       '@types': path.resolve(__dirname, './src/react/types'),
-      '@themes': path.resolve(__dirname, './src/react/themes')
-    }
+      '@themes': path.resolve(__dirname, './src/react/themes'),
+      // React Native Web aliases for Tamagui
+      'react-native': 'react-native-web',
+      'react-native-svg': 'react-native-svg-web'
+    },
+    extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js']
   },
 
   server: {

@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { Backend, BatchFile, RecordedAudio, TranscribeResult } from '@types/index'
+import type { Backend, BatchFile, RecordedAudio, TranscribeResult } from '../types'
 
 interface AppState {
   // Models & Backends

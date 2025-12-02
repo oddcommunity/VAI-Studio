@@ -3,7 +3,7 @@
  * Handles user settings persistence using localStorage
  */
 
-import type { UserSettings } from '@types/index'
+import type { UserSettings } from '../types'
 
 const SETTINGS_KEY = 'vai-studio-settings'
 

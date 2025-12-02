@@ -3,7 +3,7 @@
  * Type-safe wrapper for window.electronAPI calls
  */
 
-import type { ElectronAPI } from '@types/index'
+import type { ElectronAPI } from '../types'
 
 class ElectronBridge {
   private api: ElectronAPI | null = null

@@ -4,7 +4,7 @@
  */
 
 import { electronBridge } from './electron.bridge'
-import type { Backend, Model } from '@types/index'
+import type { Backend, Model } from '../types'
 
 export class ModelService {
   /**
@@ -28,12 +28,30 @@ export class ModelService {
   /**
    * Download a model for a specific backend
    */
-  async downloadModel(backend: string, modelName: string): Promise<void> {
+  async downloadModel(
+    backend: string,
+    modelName: string,
+    onProgress?: (progress: number, message: string) => void
+  ): Promise<void> {
     try {
-      const result = await electronBridge.downloadModel(backend, modelName)
+      // Set up progress listener if callback provided
+      let cleanupProgress: (() => void) | undefined
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to download model')
+      if (onProgress) {
+        cleanupProgress = electronBridge.onProgress((data) => {
+          onProgress(data.progress, data.message)
+        })
+      }
+
+      try {
+        const result = await electronBridge.downloadModel(backend, modelName)
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to download model')
+        }
+      } finally {
+        // Clean up progress listener
+        cleanupProgress?.()
       }
     } catch (error) {
       console.error('[ModelService] Error downloading model:', error)
