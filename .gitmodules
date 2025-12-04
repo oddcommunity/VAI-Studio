@@ -1,0 +1,6 @@
+[submodule "odd-design-system"]
+	path = odd-design-system
+	url = https://github.com/oddcommunity/odd-design-system
+[submodule "odd-core"]
+	path = odd-core
+	url = https://github.com/oddcommunity/odd-core
