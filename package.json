@@ -114,10 +114,12 @@
     }
   },
   "dependencies": {
-    "@odd-core/types": "file:./odd-core/packages/types",
-    "@odd-design-system/ui-components": "file:./odd-design-system/packages/ui-components",
-    "@odd-design-system/design-tokens": "file:./odd-design-system/packages/design-tokens",
-    "@odd-design-system/icons": "file:./odd-design-system/packages/icons",
+    "@odd-core/types": "workspace:*",
+    "@odd-core/auth": "workspace:*",
+    "@odd-core/log": "workspace:*",
+    "@odd-design-system/ui-components": "workspace:*",
+    "@odd-design-system/design-tokens": "workspace:*",
+    "@odd-design-system/icons": "workspace:*",
     "@tamagui/config": "^1.110.0",
     "@tamagui/lucide-icons": "^1.110.0",
     "@tamagui/react-native-media-driver": "^1.110.0",

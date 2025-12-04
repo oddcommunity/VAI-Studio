@@ -1,0 +1,3 @@
+packages:
+  - 'odd-core/packages/*'
+  - 'odd-design-system/packages/*'
