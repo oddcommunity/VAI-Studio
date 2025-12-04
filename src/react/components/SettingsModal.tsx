@@ -1,13 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import {
-  YStack,
-  XStack,
-  Text,
-  Button,
-  Select,
-  Checkbox,
-  Sheet,
-} from 'tamagui'
+import { YStack, XStack, Text, Button, H3 } from '@odd-design-system/ui-components'
+import { Select, Checkbox, Sheet } from 'tamagui'
 import { X, Settings, Check, ChevronDown, RotateCcw, Save } from '@tamagui/lucide-icons'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { useToastStore } from '../stores/useToastStore'

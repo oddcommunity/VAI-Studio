@@ -1,6 +1,7 @@
 // ResultsPanel component
 import { useCallback } from 'react'
-import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
+import { YStack, XStack, Text, Button, H2 } from '@odd-design-system/ui-components'
+import { ScrollView, styled } from 'tamagui'
 import { FileAudio, Trash2, LayoutGrid } from '@tamagui/lucide-icons'
 import { ResultCard } from './ResultCard'
 import { sanitizeFileName } from '../utils/sanitize'

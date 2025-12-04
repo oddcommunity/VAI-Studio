@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { YStack, XStack, Text, Button, ScrollView, styled, Popover } from 'tamagui'
+import { YStack, XStack, Text, Button, Card } from '@odd-design-system/ui-components'
+import { ScrollView, styled, Popover } from 'tamagui'
 import {
   Copy,
   Check,
