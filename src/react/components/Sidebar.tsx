@@ -19,6 +19,7 @@ import {
   FolderIcon,
 } from './Icons'
 import { BatchFilesList } from './BatchFilesList'
+import { Z_INDEX } from '../constants/zIndex'
 import type { BatchFile } from '../types'
 
 export interface Model {
@@ -149,9 +150,9 @@ export function Sidebar({
                 </Button>
                 <Button
                   flex={1}
-                  backgroundColor="hsl(0, 84%, 60%)"
-                  hoverStyle={{ backgroundColor: 'hsl(0, 84%, 65%)' }}
-                  pressStyle={{ backgroundColor: 'hsl(0, 84%, 70%)' }}
+                  backgroundColor="$recording"
+                  hoverStyle={{ opacity: 0.9 }}
+                  pressStyle={{ opacity: 0.8 }}
                   paddingHorizontal={16}
                   paddingVertical={16}
                   borderRadius={8}
@@ -248,7 +249,7 @@ export function Sidebar({
                     fontFamily="$heading"
                   />
                 </Select.Trigger>
-                <Select.Content zIndex={200000}>
+                <Select.Content zIndex={Z_INDEX.SELECT_CONTENT}>
                   <Select.ScrollUpButton />
                   <Select.Viewport>
                     <Select.Group>
@@ -344,9 +345,9 @@ export function Sidebar({
         {/* Transcribe Button */}
         <Button
           width="100%"
-          backgroundColor="hsl(28, 100%, 58%)"
-          hoverStyle={{ backgroundColor: 'hsl(28, 100%, 62%)' }}
-          pressStyle={{ backgroundColor: 'hsl(28, 100%, 66%)' }}
+          backgroundColor="$cta"
+          hoverStyle={{ backgroundColor: '$ctaHover' }}
+          pressStyle={{ backgroundColor: '$ctaPress' }}
           paddingHorizontal={16}
           paddingVertical={18}
           borderRadius={8}

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
 
   base: './',
@@ -11,11 +11,24 @@ export default defineConfig({
   build: {
     outDir: 'dist-react',
     emptyOutDir: true,
+    sourcemap: mode === 'production' ? 'hidden' : true,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html')
+      },
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'tamagui-core': ['tamagui'],
+          'tamagui-config': ['@tamagui/config', '@tamagui/themes', '@tamagui/shorthands'],
+          'state-management': ['zustand'],
+        }
       }
-    }
+    },
+    // Remove console.log in production
+    minify: 'esbuild',
+    target: 'esnext',
   },
 
   resolve: {
@@ -42,5 +55,11 @@ export default defineConfig({
   // Optimize for Electron
   optimizeDeps: {
     exclude: ['electron']
-  }
-})
+  },
+
+  // Production-only settings
+  esbuild: mode === 'production' ? {
+    drop: ['console', 'debugger'],
+    pure: ['console.log', 'console.debug', 'console.info'],
+  } : {},
+}))

@@ -4,7 +4,7 @@
  */
 
 import { electronBridge } from './electron.bridge'
-import type { TranscribeOptions, TranscribeResult } from '../types'
+import type { TranscribeOptions, TranscribeResult, ExportableResult } from '../types'
 
 export class TranscriptionService {
   /**
@@ -62,7 +62,7 @@ export class TranscriptionService {
   /**
    * Export transcription result to file
    */
-  async exportResult(result: any, format: 'txt' | 'json' | 'srt' | 'vtt', defaultName: string) {
+  async exportResult(result: ExportableResult, format: 'txt' | 'json' | 'srt' | 'vtt', defaultName: string) {
     try {
       const filters = [
         { name: 'Plain Text', extensions: ['txt'] },

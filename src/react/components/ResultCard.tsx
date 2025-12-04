@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
+import { YStack, XStack, Text, Button, ScrollView, styled, Popover } from 'tamagui'
 import {
   Copy,
   Check,
@@ -10,9 +10,21 @@ import {
   Globe,
   Download,
   AlertCircle,
+  FileText,
+  FileJson,
+  Subtitles,
 } from '@tamagui/lucide-icons'
 import type { TranscribeResult } from '../types'
 import { useToastStore } from '../stores/useToastStore'
+
+type ExportFormat = 'txt' | 'json' | 'srt' | 'vtt'
+
+const formatOptions: { format: ExportFormat; label: string; icon: React.ReactNode }[] = [
+  { format: 'txt', label: 'Plain Text (.txt)', icon: <FileText size={14} color="$secondary7" /> },
+  { format: 'json', label: 'JSON (.json)', icon: <FileJson size={14} color="$secondary7" /> },
+  { format: 'srt', label: 'SubRip (.srt)', icon: <Subtitles size={14} color="$secondary7" /> },
+  { format: 'vtt', label: 'WebVTT (.vtt)', icon: <Subtitles size={14} color="$secondary7" /> },
+]
 
 const Card = styled(YStack, {
   backgroundColor: '$secondary2',
@@ -57,12 +69,27 @@ const TranscriptText = styled(Text, {
 })
 
 const ErrorBox = styled(YStack, {
-  backgroundColor: 'hsla(0, 84%, 60%, 0.1)',
+  backgroundColor: '$errorBackground',
   borderWidth: 1,
-  borderColor: 'hsl(0, 84%, 60%)',
+  borderColor: '$errorBorder',
   borderRadius: 6,
   padding: 12,
   gap: 8,
+})
+
+const ExportMenuItem = styled(XStack, {
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  alignItems: 'center',
+  gap: 8,
+  borderRadius: 4,
+  cursor: 'pointer',
+  hoverStyle: {
+    backgroundColor: '$secondary3',
+  },
+  pressStyle: {
+    backgroundColor: '$secondary4',
+  },
 })
 
 export interface ResultCardProps {
@@ -82,7 +109,13 @@ export function ResultCard({
 }: ResultCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [copied, setCopied] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const { showToast } = useToastStore()
+
+  const handleExport = useCallback((format: ExportFormat) => {
+    setExportOpen(false)
+    onExport?.(format)
+  }, [onExport])
 
   const handleCopy = useCallback(async () => {
     if (!result.text) return
@@ -121,8 +154,8 @@ export function ResultCard({
         <CardContent>
           <ErrorBox>
             <XStack alignItems="center" gap={8}>
-              <AlertCircle size={18} color="hsl(0, 84%, 60%)" />
-              <Text fontSize={14} fontWeight="500" color="hsl(0, 84%, 60%)">
+              <AlertCircle size={18} color="$errorText" />
+              <Text fontSize={14} fontWeight="500" color="$errorText">
                 Transcription Failed
               </Text>
             </XStack>
@@ -180,7 +213,7 @@ export function ResultCard({
             chromeless
             onPress={handleCopy}
             hoverStyle={{ backgroundColor: '$secondary3' }}
-            icon={copied ? <Check size={16} color="hsl(142, 76%, 36%)" /> : <Copy size={16} color="$secondary7" />}
+            icon={copied ? <Check size={16} color="$success" /> : <Copy size={16} color="$secondary7" />}
           >
             <Text fontSize={12} color="$secondary9">
               {copied ? 'Copied!' : 'Copy'}
@@ -188,17 +221,48 @@ export function ResultCard({
           </Button>
 
           {onExport && (
-            <Button
-              size="$2"
-              chromeless
-              hoverStyle={{ backgroundColor: '$secondary3' }}
-              icon={<Download size={16} color="$secondary7" />}
-              onPress={() => onExport('txt')}
-            >
-              <Text fontSize={12} color="$secondary9">
-                Export
-              </Text>
-            </Button>
+            <Popover open={exportOpen} onOpenChange={setExportOpen} placement="bottom-end">
+              <Popover.Trigger asChild>
+                <Button
+                  size="$2"
+                  chromeless
+                  hoverStyle={{ backgroundColor: '$secondary3' }}
+                  icon={<Download size={16} color="$secondary7" />}
+                >
+                  <Text fontSize={12} color="$secondary9">
+                    Export
+                  </Text>
+                  <ChevronDown size={12} color="$secondary7" />
+                </Button>
+              </Popover.Trigger>
+              <Popover.Content
+                backgroundColor="$secondary2"
+                borderWidth={1}
+                borderColor="$secondary4"
+                borderRadius={8}
+                padding={4}
+                minWidth={180}
+                elevate
+                animation="quick"
+                enterStyle={{ opacity: 0, y: -4 }}
+                exitStyle={{ opacity: 0, y: -4 }}
+              >
+                <Popover.Arrow backgroundColor="$secondary2" borderColor="$secondary4" />
+                <YStack gap={2}>
+                  {formatOptions.map((option) => (
+                    <ExportMenuItem
+                      key={option.format}
+                      onPress={() => handleExport(option.format)}
+                    >
+                      {option.icon}
+                      <Text fontSize={13} color="$secondary11">
+                        {option.label}
+                      </Text>
+                    </ExportMenuItem>
+                  ))}
+                </YStack>
+              </Popover.Content>
+            </Popover>
           )}
 
           <Button

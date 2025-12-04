@@ -3,7 +3,7 @@
  * Type-safe wrapper for window.electronAPI calls
  */
 
-import type { ElectronAPI } from '../types'
+import type { ElectronAPI, ExportableResult, FileFilter, TranscribeOptions } from '../types'
 
 class ElectronBridge {
   private api: ElectronAPI | null = null
@@ -58,27 +58,29 @@ class ElectronBridge {
     return this.ensureAPI().listBackends()
   }
 
-  async transcribe(options: {
-    audioPath: string
-    backend: string
-    modelName: string
-    task?: 'transcribe' | 'translate'
-    language?: string
-    device?: 'auto' | 'cpu' | 'cuda'
-    quantization?: 'auto' | 'fp32' | 'fp16' | 'int8'
-  }) {
+  async transcribe(options: TranscribeOptions) {
+    // Validate required options
+    if (!options.audioPath || !options.backend || !options.modelName) {
+      throw new Error('Invalid transcription options: audioPath, backend, and modelName are required')
+    }
     return this.ensureAPI().transcribe(options)
   }
 
   async downloadModel(backend: string, modelName: string) {
+    if (!backend || !modelName) {
+      throw new Error('Invalid download options: backend and modelName are required')
+    }
     return this.ensureAPI().downloadModel(backend, modelName)
   }
 
-  async exportResult(result: any, format: string, filePath: string) {
+  async exportResult(result: ExportableResult, format: string, filePath: string) {
+    if (!format || !filePath) {
+      throw new Error('Invalid export options: format and filePath are required')
+    }
     return this.ensureAPI().exportResult(result, format, filePath)
   }
 
-  async saveDialog(defaultName: string, filters: any[]) {
+  async saveDialog(defaultName: string, filters: FileFilter[]) {
     return this.ensureAPI().saveDialog(defaultName, filters)
   }
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { YStack, XStack, Text, Button, styled } from 'tamagui'
 import { Mic, Square, Trash2, Check } from '@tamagui/lucide-icons'
-import { useAppStore } from '../stores/useAppStore'
-import { useToastStore } from '../stores/useToastStore'
+import { useAudioRecorder } from '../hooks/useAudioRecorder'
+import { Z_INDEX } from '../constants/zIndex'
 
 const RecordingOverlay = styled(YStack, {
   position: 'absolute',
@@ -13,7 +13,7 @@ const RecordingOverlay = styled(YStack, {
   backgroundColor: 'rgba(13, 13, 15, 0.95)',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 9998,
+  zIndex: Z_INDEX.RECORDING_CONTROLS,
   padding: 32,
 })
 
@@ -245,41 +245,36 @@ export function RecordingControls({
 
 // Hook-connected version for easier use
 export function RecordingOverlayConnected() {
-  const {
-    isRecording,
-    setIsRecording,
-    recordedAudio,
-    setRecordedAudio,
-    setSelectedFile,
-  } = useAppStore()
-  const { showToast } = useToastStore()
   const [showOverlay, setShowOverlay] = useState(false)
 
-  const handleStartRecording = useCallback(() => {
-    setIsRecording(true)
-    setShowOverlay(true)
-    // Note: Actual recording logic is in useAudioRecorder hook
-  }, [setIsRecording])
+  // Use the audio recorder hook for actual recording functionality
+  const {
+    isRecording,
+    recordedAudio,
+    startRecording,
+    stopRecording,
+    discardRecording,
+    useRecording,
+  } = useAudioRecorder()
 
-  const handleStopRecording = useCallback(() => {
-    setIsRecording(false)
-    // Recording stopped - wait for recordedAudio to be set
-  }, [setIsRecording])
+  const handleStartRecording = useCallback(async () => {
+    setShowOverlay(true)
+    await startRecording()
+  }, [startRecording])
+
+  const handleStopRecording = useCallback(async () => {
+    await stopRecording()
+  }, [stopRecording])
 
   const handleUseRecording = useCallback(() => {
-    if (recordedAudio?.filePath) {
-      setSelectedFile(recordedAudio.filePath)
-      showToast('Recording ready for transcription', 'success', 2000)
-    }
+    useRecording()
     setShowOverlay(false)
-    setRecordedAudio(null)
-  }, [recordedAudio, setSelectedFile, setRecordedAudio, showToast])
+  }, [useRecording])
 
   const handleDiscardRecording = useCallback(() => {
-    setRecordedAudio(null)
+    discardRecording()
     setShowOverlay(false)
-    showToast('Recording discarded', 'info', 2000)
-  }, [setRecordedAudio, showToast])
+  }, [discardRecording])
 
   return (
     <RecordingControls

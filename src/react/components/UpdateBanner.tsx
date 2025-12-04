@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { XStack, Text, Button, styled, AnimatePresence } from 'tamagui'
 import { Download, X, RefreshCw } from '@tamagui/lucide-icons'
 import { electronBridge } from '../services/electron.bridge'
+import { Z_INDEX } from '../constants/zIndex'
 
 const BannerContainer = styled(XStack, {
   position: 'absolute',
@@ -14,7 +15,7 @@ const BannerContainer = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'center',
   gap: 16,
-  zIndex: 100001,
+  zIndex: Z_INDEX.UPDATE_BANNER,
   enterStyle: {
     opacity: 0,
     y: -50,
@@ -100,55 +101,3 @@ export function UpdateBanner({ onDismiss }: UpdateBannerProps) {
   )
 }
 
-// Simpler inline notification version
-export function UpdateNotification() {
-  const [updateAvailable, setUpdateAvailable] = useState(false)
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
-
-  useEffect(() => {
-    const cleanup = electronBridge.onUpdateReady((info) => {
-      setUpdateAvailable(true)
-      setUpdateVersion(info.version)
-    })
-
-    return cleanup
-  }, [])
-
-  const handleRestart = useCallback(() => {
-    electronBridge.restartToUpdate()
-  }, [])
-
-  if (!updateAvailable) {
-    return null
-  }
-
-  return (
-    <XStack
-      backgroundColor="$primary2"
-      borderWidth={1}
-      borderColor="$primary4"
-      borderRadius={8}
-      padding={12}
-      alignItems="center"
-      gap={12}
-    >
-      <Download size={18} color="$primary8" />
-      <Text flex={1} fontSize={13} color="$secondary11">
-        {updateVersion
-          ? `Version ${updateVersion} is available`
-          : 'An update is available'}
-      </Text>
-      <Button
-        size="$2"
-        backgroundColor="$primary6"
-        hoverStyle={{ backgroundColor: '$primary5' }}
-        borderRadius={6}
-        onPress={handleRestart}
-      >
-        <Text fontSize={12} fontWeight="500" color="#FFFFFF">
-          Update
-        </Text>
-      </Button>
-    </XStack>
-  )
-}

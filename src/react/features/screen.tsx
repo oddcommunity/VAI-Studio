@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Theme } from 'tamagui'
 import { VAIStudioScreen } from '../components/VAIStudio'
 import { ResultsPanel } from '../components/ResultsPanel'
 import { WelcomeScreen } from '../components/WelcomeScreen'
 import { useAppStore } from '../stores/useAppStore'
+import { useSettingsStore } from '../stores/useSettingsStore'
 import { useToastStore } from '../stores/useToastStore'
 import { audioService } from '../services/audio.service'
 import { transcriptionService } from '../services/transcription.service'
@@ -38,20 +39,27 @@ export function VAIStudioFeatureScreen({
     addBatchFiles,
     removeBatchFile,
     clearBatchFiles,
+    updateBatchFileStatus,
     transcriptionResults,
     setTranscriptionResults,
     setUIState,
     setProgress,
   } = useAppStore()
 
+  // Settings for transcription
+  const {
+    devicePreference,
+    quantization,
+    defaultLanguage,
+  } = useSettingsStore()
+
   const { showToast } = useToastStore()
 
-  // Load backends on mount
-  useEffect(() => {
-    loadBackends()
-  }, [])
+  // Comparison mode: track multiple selected models
+  const [comparisonModels, setComparisonModels] = useState<string[]>([])
 
-  const loadBackends = async () => {
+  // Load backends on mount
+  const loadBackends = useCallback(async () => {
     try {
       const backendsData = await modelService.listBackends()
       setBackends(backendsData)
@@ -59,7 +67,11 @@ export function VAIStudioFeatureScreen({
       showToast('Failed to load backends', 'error', 5000)
       console.error('Failed to load backends:', error)
     }
-  }
+  }, [setBackends, showToast])
+
+  useEffect(() => {
+    loadBackends()
+  }, [loadBackends])
 
   // Convert backends to model list for UI
   const models = useMemo(() => {
@@ -127,14 +139,49 @@ export function VAIStudioFeatureScreen({
     }
   }, [isRecording, setIsRecording, showToast])
 
-  // Transcription handler
+  // Helper to transcribe a single file with a single model
+  const transcribeSingleFile = useCallback(
+    async (
+      audioPath: string,
+      backend: string,
+      modelName: string
+    ): Promise<TranscriptionResultItem> => {
+      const result = await transcriptionService.transcribe({
+        audioPath,
+        backend,
+        modelName,
+        language: defaultLanguage !== 'auto' ? defaultLanguage : undefined,
+        device: devicePreference !== 'auto' ? devicePreference : undefined,
+        quantization: quantization !== 'auto' ? quantization : undefined,
+      })
+
+      return { backend, model: modelName, result }
+    },
+    [defaultLanguage, devicePreference, quantization]
+  )
+
+  // Transcription handler - supports single file, batch, and comparison modes
   const handleTranscribe = useCallback(async () => {
-    if (!selectedFile) {
+    // Determine which files to process
+    const filesToProcess = batchFiles.length > 0
+      ? batchFiles.map((f) => f.path)
+      : selectedFile
+        ? [selectedFile]
+        : []
+
+    if (filesToProcess.length === 0) {
       showToast('Please select an audio file first', 'warning', 3000)
       return
     }
 
-    if (!selectedModel) {
+    // Determine which models to use
+    const modelsToUse = comparisonMode && comparisonModels.length > 0
+      ? comparisonModels
+      : selectedModel
+        ? [selectedModel]
+        : []
+
+    if (modelsToUse.length === 0) {
       showToast('Please select a model first', 'warning', 3000)
       return
     }
@@ -143,29 +190,92 @@ export function VAIStudioFeatureScreen({
     setUIState({ loading: true, welcome: false })
     setProgress(0, 'Starting transcription...', 'transcribing')
 
+    const allResults: TranscriptionResultItem[] = []
+    const totalOperations = filesToProcess.length * modelsToUse.length
+    let completedOperations = 0
+
     try {
-      const { backend, model } = JSON.parse(selectedModel)
+      // Process each file
+      for (let fileIndex = 0; fileIndex < filesToProcess.length; fileIndex++) {
+        const audioPath = filesToProcess[fileIndex]
+        if (!audioPath) continue
 
-      const result = await transcriptionService.transcribe({
-        audioPath: selectedFile,
-        backend,
-        modelName: model,
-      })
+        const fileName = audioPath.split('/').pop()?.split('\\').pop() || audioPath
 
-      if (result.success) {
-        // Add result to the results array
-        const newResult: TranscriptionResultItem = {
-          backend,
-          model,
-          result,
+        // Update batch file status if in batch mode
+        if (batchFiles.length > 0) {
+          updateBatchFileStatus(fileIndex, 'processing')
         }
 
-        setTranscriptionResults([...transcriptionResults, newResult])
-        setUIState({ results: true, loading: false })
-        showToast('Transcription complete!', 'success', 3000)
+        // Process each model for this file
+        for (const modelJson of modelsToUse) {
+          // Parse model JSON once at the start
+          let parsedModel: { backend: string; model: string }
+          try {
+            parsedModel = JSON.parse(modelJson)
+          } catch {
+            // Invalid JSON, skip this model
+            completedOperations++
+            continue
+          }
+
+          const { backend, model } = parsedModel
+
+          try {
+            setProgress(
+              Math.round((completedOperations / totalOperations) * 100),
+              `Transcribing ${fileName} with ${model}...`,
+              'transcribing'
+            )
+
+            const resultItem = await transcribeSingleFile(audioPath, backend, model)
+            allResults.push(resultItem)
+
+            completedOperations++
+            setProgress(
+              Math.round((completedOperations / totalOperations) * 100),
+              `Completed ${completedOperations}/${totalOperations}`,
+              'transcribing'
+            )
+          } catch (error) {
+            allResults.push({
+              backend,
+              model,
+              result: {
+                success: false,
+                error: error instanceof Error ? error.message : 'Transcription failed',
+              },
+            })
+            completedOperations++
+          }
+        }
+
+        // Update batch file status to completed
+        if (batchFiles.length > 0) {
+          const fileResults = allResults.filter(
+            (r) => r.result.success
+          )
+          updateBatchFileStatus(
+            fileIndex,
+            fileResults.length > 0 ? 'completed' : 'failed',
+            fileResults[0]?.result
+          )
+        }
+      }
+
+      // Update results using functional update to avoid stale state
+      setTranscriptionResults(prev => [...prev, ...allResults])
+      setUIState({ results: true, loading: false })
+
+      const successCount = allResults.filter((r) => r.result.success).length
+      if (successCount === allResults.length) {
+        showToast(`Transcription complete! (${successCount} result${successCount > 1 ? 's' : ''})`, 'success', 3000)
       } else {
-        showToast(result.error || 'Transcription failed', 'error', 5000)
-        setUIState({ loading: false })
+        showToast(
+          `Completed with ${successCount}/${allResults.length} successful`,
+          successCount > 0 ? 'warning' : 'error',
+          5000
+        )
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Transcription failed'
@@ -179,13 +289,24 @@ export function VAIStudioFeatureScreen({
   }, [
     selectedFile,
     selectedModel,
+    batchFiles,
+    comparisonMode,
+    comparisonModels,
     setIsTranscribing,
     setUIState,
     setProgress,
-    transcriptionResults,
     setTranscriptionResults,
+    updateBatchFileStatus,
+    transcribeSingleFile,
     showToast,
   ])
+
+  // Clear comparison models when comparison mode is disabled
+  useEffect(() => {
+    if (!comparisonMode) {
+      setComparisonModels([])
+    }
+  }, [comparisonMode])
 
   // Clear results handler
   const handleClearResults = useCallback(() => {
@@ -232,7 +353,7 @@ export function VAIStudioFeatureScreen({
     <Theme name="vai_dark">
       <VAIStudioScreen
         models={models}
-        selectedModel={selectedModel}
+        selectedModel={selectedModel ?? undefined}
         onModelChange={setSelectedModel}
         onSelectFile={handleSelectFile}
         onRecordAudio={handleRecordAudio}

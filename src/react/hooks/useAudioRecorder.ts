@@ -80,20 +80,32 @@ export function useAudioRecorder() {
     try {
       const audio = audioService.createAudioPlayer(recordedAudio.filePath)
 
+      // Cleanup function to properly release audio resources
+      const cleanup = () => {
+        audio.onended = null
+        audio.onerror = null
+        audio.pause()
+        audio.src = ''
+        audio.load() // Reset the audio element
+      }
+
       audio.play()
         .then(() => {
           showToast('Playing recording...', 'info', 1000)
         })
         .catch((err) => {
+          cleanup()
           showToast(`Playback failed: ${err.message}`, 'error')
         })
 
       audio.onended = () => {
         showToast('Playback finished', 'success', 1000)
+        cleanup()
       }
 
       audio.onerror = () => {
         showToast('Audio playback error', 'error')
+        cleanup()
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to play audio'

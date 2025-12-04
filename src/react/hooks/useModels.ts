@@ -16,11 +16,6 @@ export function useModels() {
   const { backends, setBackends } = useAppStore()
   const { showToast } = useToastStore()
 
-  // Load backends on mount
-  useEffect(() => {
-    loadBackends()
-  }, [])
-
   const loadBackends = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -36,6 +31,11 @@ export function useModels() {
       setLoading(false)
     }
   }, [setBackends, showToast])
+
+  // Load backends on mount
+  useEffect(() => {
+    loadBackends()
+  }, [loadBackends])
 
   const downloadModel = useCallback(async (backend: string, modelName: string) => {
     try {

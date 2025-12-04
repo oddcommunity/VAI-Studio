@@ -63,7 +63,8 @@ export { ModelManagerModal } from './ModelManagerModal'
 export { AuthModal } from './AuthModal'
 
 // System
-export { UpdateBanner, UpdateNotification } from './UpdateBanner'
+export { UpdateBanner } from './UpdateBanner'
+export { ErrorBoundary } from './ErrorBoundary'
 
 // Batch processing
 export { BatchFilesList } from './BatchFilesList'

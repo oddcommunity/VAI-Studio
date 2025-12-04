@@ -59,6 +59,40 @@ export const vaiTheme = {
   tertiary9: 'hsl(180, 70%, 92%)',
   tertiary10: 'hsl(180, 70%, 96%)',
 
+  // SEMANTIC COLORS - Status/Feedback
+  // Success - Green
+  success: 'hsl(142, 76%, 36%)',
+  successBackground: 'hsla(142, 76%, 36%, 0.1)',
+  successBorder: 'hsl(142, 76%, 36%)',
+  successText: 'hsl(142, 76%, 36%)',
+
+  // Error - Red
+  error: 'hsl(0, 84%, 60%)',
+  errorBackground: 'hsla(0, 84%, 60%, 0.1)',
+  errorBorder: 'hsl(0, 84%, 60%)',
+  errorText: 'hsl(0, 84%, 60%)',
+
+  // Warning - Amber/Orange
+  warning: 'hsl(38, 92%, 50%)',
+  warningBackground: 'hsla(38, 92%, 50%, 0.1)',
+  warningBorder: 'hsl(38, 92%, 50%)',
+  warningText: 'hsl(38, 92%, 50%)',
+
+  // Info - Blue
+  info: 'hsl(215, 83%, 50%)',
+  infoBackground: 'hsla(215, 83%, 50%, 0.1)',
+  infoBorder: 'hsl(215, 83%, 50%)',
+  infoText: 'hsl(215, 83%, 50%)',
+
+  // Recording - Red for recording indicator
+  recording: 'hsl(0, 84%, 60%)',
+  recordingBackground: 'hsla(0, 84%, 60%, 0.15)',
+
+  // CTA - Orange for call-to-action buttons
+  cta: 'hsl(28, 100%, 58%)',
+  ctaHover: 'hsl(28, 100%, 62%)',
+  ctaPress: 'hsl(28, 100%, 66%)',
+
   // Semantic color mappings (Tamagui compatibility)
   background: 'hsl(215, 15%, 99%)',
   backgroundHover: 'hsl(215, 15%, 96%)',
@@ -145,6 +179,40 @@ export const vaiDarkTheme = {
   tertiary8: 'hsl(180, 70%, 85%)',
   tertiary9: 'hsl(180, 70%, 92%)',
   tertiary10: 'hsl(180, 70%, 96%)',
+
+  // SEMANTIC COLORS - Status/Feedback (same as light, work well on dark)
+  // Success - Green
+  success: 'hsl(142, 76%, 36%)',
+  successBackground: 'hsla(142, 76%, 36%, 0.15)',
+  successBorder: 'hsl(142, 76%, 36%)',
+  successText: 'hsl(142, 76%, 46%)',
+
+  // Error - Red
+  error: 'hsl(0, 84%, 60%)',
+  errorBackground: 'hsla(0, 84%, 60%, 0.15)',
+  errorBorder: 'hsl(0, 84%, 60%)',
+  errorText: 'hsl(0, 84%, 70%)',
+
+  // Warning - Amber/Orange
+  warning: 'hsl(38, 92%, 50%)',
+  warningBackground: 'hsla(38, 92%, 50%, 0.15)',
+  warningBorder: 'hsl(38, 92%, 50%)',
+  warningText: 'hsl(38, 92%, 60%)',
+
+  // Info - Blue
+  info: 'hsl(215, 83%, 50%)',
+  infoBackground: 'hsla(215, 83%, 50%, 0.15)',
+  infoBorder: 'hsl(215, 83%, 50%)',
+  infoText: 'hsl(215, 83%, 65%)',
+
+  // Recording - Red for recording indicator
+  recording: 'hsl(0, 84%, 60%)',
+  recordingBackground: 'hsla(0, 84%, 60%, 0.2)',
+
+  // CTA - Orange for call-to-action buttons
+  cta: 'hsl(28, 100%, 58%)',
+  ctaHover: 'hsl(28, 100%, 62%)',
+  ctaPress: 'hsl(28, 100%, 66%)',
 
   // Semantic color mappings (INVERTED for dark mode)
   background: 'hsl(215, 15%, 10%)',

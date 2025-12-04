@@ -1,6 +1,7 @@
 // LoadingScreen component
 import { YStack, Text, Progress, Spinner, styled } from 'tamagui'
 import { useAppStore } from '../stores/useAppStore'
+import { Z_INDEX } from '../constants/zIndex'
 
 const LoadingContainer = styled(YStack, {
   position: 'absolute',
@@ -11,7 +12,7 @@ const LoadingContainer = styled(YStack, {
   backgroundColor: 'rgba(13, 13, 15, 0.9)',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 9999,
+  zIndex: Z_INDEX.LOADING_SCREEN,
   padding: 32,
 })
 

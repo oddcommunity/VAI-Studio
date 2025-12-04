@@ -1,10 +1,13 @@
 /**
  * Toast Notification Store
- * Manages toast notifications
+ * Manages toast notifications with proper cleanup
  */
 
 import { create } from 'zustand'
 import type { ToastMessage, ToastType } from '../types'
+
+// Store timeout IDs for cleanup
+const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 interface ToastState {
   toasts: ToastMessage[]
@@ -24,20 +27,39 @@ export const useToastStore = create<ToastState>((set) => ({
       toasts: [...state.toasts, toast]
     }))
 
-    // Auto-remove after duration
+    // Auto-remove after duration with proper cleanup tracking
     if (duration > 0) {
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
+        // Clean up the timeout reference
+        toastTimeouts.delete(id)
         set((state) => ({
           toasts: state.toasts.filter(t => t.id !== id)
         }))
       }, duration)
+
+      // Store timeout for potential cleanup
+      toastTimeouts.set(id, timeoutId)
     }
   },
 
-  removeToast: (id) =>
+  removeToast: (id) => {
+    // Clear any pending timeout for this toast
+    const timeoutId = toastTimeouts.get(id)
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      toastTimeouts.delete(id)
+    }
+
     set((state) => ({
       toasts: state.toasts.filter(t => t.id !== id)
-    })),
+    }))
+  },
 
-  clearAllToasts: () => set({ toasts: [] })
+  clearAllToasts: () => {
+    // Clear all pending timeouts
+    toastTimeouts.forEach((timeoutId) => clearTimeout(timeoutId))
+    toastTimeouts.clear()
+
+    set({ toasts: [] })
+  }
 }))

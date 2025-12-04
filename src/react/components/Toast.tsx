@@ -2,6 +2,7 @@ import React from 'react'
 import { YStack, XStack, Text, Button, AnimatePresence, styled } from 'tamagui'
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from '@tamagui/lucide-icons'
 import { useToastStore } from '../stores/useToastStore'
+import { Z_INDEX } from '../constants/zIndex'
 import type { ToastType } from '../types'
 
 const ToastContainer = styled(YStack, {
@@ -9,7 +10,7 @@ const ToastContainer = styled(YStack, {
   top: 16,
   right: 16,
   gap: 8,
-  zIndex: 100000,
+  zIndex: Z_INDEX.TOAST,
   pointerEvents: 'box-none',
 })
 

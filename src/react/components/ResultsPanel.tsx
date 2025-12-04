@@ -1,7 +1,9 @@
 // ResultsPanel component
+import { useCallback } from 'react'
 import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
 import { FileAudio, Trash2, LayoutGrid } from '@tamagui/lucide-icons'
 import { ResultCard } from './ResultCard'
+import { sanitizeFileName } from '../utils/sanitize'
 import type { TranscribeResult } from '../types'
 
 const Container = styled(YStack, {
@@ -57,6 +59,32 @@ export interface ResultsPanelProps {
   selectedFile?: string | null
 }
 
+// Memoized wrapper for ResultCard to prevent inline function recreation
+interface MemoizedResultCardProps {
+  item: TranscriptionResultItem
+  onExport?: (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt') => void
+  defaultExpanded: boolean
+}
+
+function MemoizedResultCard({ item, onExport, defaultExpanded }: MemoizedResultCardProps) {
+  const handleExport = useCallback(
+    (format: 'txt' | 'json' | 'srt' | 'vtt') => {
+      onExport?.(item, format)
+    },
+    [onExport, item]
+  )
+
+  return (
+    <ResultCard
+      backend={item.backend}
+      model={item.model}
+      result={item.result}
+      onExport={onExport ? handleExport : undefined}
+      defaultExpanded={defaultExpanded}
+    />
+  )
+}
+
 export function ResultsPanel({
   results,
   comparisonMode = false,
@@ -91,7 +119,7 @@ export function ResultsPanel({
     )
   }
 
-  const fileName = selectedFile?.split('/').pop()?.split('\\').pop() || 'Audio File'
+  const fileName = sanitizeFileName(selectedFile)
 
   return (
     <Container>
@@ -143,11 +171,9 @@ export function ResultsPanel({
           <ComparisonGrid>
             {results.map((item, index) => (
               <ComparisonColumn key={`${item.backend}-${item.model}-${index}`}>
-                <ResultCard
-                  backend={item.backend}
-                  model={item.model}
-                  result={item.result}
-                  onExport={onExport ? (format) => onExport(item, format) : undefined}
+                <MemoizedResultCard
+                  item={item}
+                  onExport={onExport}
                   defaultExpanded={true}
                 />
               </ComparisonColumn>
@@ -156,12 +182,10 @@ export function ResultsPanel({
         ) : (
           <SingleColumn>
             {results.map((item, index) => (
-              <ResultCard
+              <MemoizedResultCard
                 key={`${item.backend}-${item.model}-${index}`}
-                backend={item.backend}
-                model={item.model}
-                result={item.result}
-                onExport={onExport ? (format) => onExport(item, format) : undefined}
+                item={item}
+                onExport={onExport}
                 defaultExpanded={index === 0}
               />
             ))}

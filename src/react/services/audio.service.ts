@@ -4,6 +4,7 @@
  */
 
 import { electronBridge } from './electron.bridge'
+import { sanitizeFilePathForUrl, isValidFilePath } from '../utils/sanitize'
 
 export class AudioService {
   private audioRecorder: MediaRecorder | null = null
@@ -63,8 +64,10 @@ export class AudioService {
       throw new Error('Audio recording is not supported in this browser')
     }
 
+    let stream: MediaStream | null = null
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
       // Determine supported MIME type
       let mimeType = 'audio/webm'
@@ -96,6 +99,10 @@ export class AudioService {
         }, 1000)
       }
     } catch (error) {
+      // Clean up stream if it was acquired but subsequent operations failed
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+      }
       console.error('[AudioService] Recording error:', error)
       throw new Error('Failed to start recording: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
@@ -111,24 +118,28 @@ export class AudioService {
         return
       }
 
+      // Store values before cleanup to avoid accessing after null assignment
+      const mimeType = this.audioRecorder.mimeType
+      const stream = this.audioRecorder.stream
+
       this.audioRecorder.onstop = () => {
-        const blob = new Blob(this.recordingChunks, { type: this.audioRecorder!.mimeType })
+        const blob = new Blob(this.recordingChunks, { type: mimeType })
         const duration = Math.floor((Date.now() - this.recordingStartTime) / 1000)
 
-        // Clean up
+        // Clean up timer
         if (this.timerInterval) {
           clearInterval(this.timerInterval)
           this.timerInterval = null
         }
 
         // Stop all tracks
-        if (this.audioRecorder!.stream) {
-          this.audioRecorder!.stream.getTracks().forEach(track => track.stop())
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop())
         }
 
         resolve({
           blob,
-          mimeType: this.audioRecorder!.mimeType,
+          mimeType,
           duration
         })
 
@@ -158,8 +169,12 @@ export class AudioService {
    * Create audio element for playback
    */
   createAudioPlayer(filePath: string): HTMLAudioElement {
+    if (!isValidFilePath(filePath)) {
+      throw new Error('Invalid file path')
+    }
     const audio = new Audio()
-    audio.src = `file://${filePath}`
+    // Encode the path to handle special characters safely
+    audio.src = `file://${sanitizeFilePathForUrl(filePath)}`
     return audio
   }
 

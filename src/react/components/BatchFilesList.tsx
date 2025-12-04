@@ -1,4 +1,5 @@
 // BatchFilesList component - displays files in batch queue
+import { memo, useCallback } from 'react'
 import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
 import { X, FileAudio, CheckCircle, AlertCircle, Loader } from '@tamagui/lucide-icons'
 import type { BatchFile } from '../types'
@@ -37,6 +38,46 @@ const statusIcons = {
   completed: <CheckCircle size={16} color="hsl(142, 76%, 36%)" />,
   failed: <AlertCircle size={16} color="hsl(0, 84%, 60%)" />,
 }
+
+// Memoized file item component to prevent unnecessary re-renders
+interface BatchFileItemProps {
+  file: BatchFile
+  index: number
+  onRemove: (index: number) => void
+}
+
+const BatchFileItem = memo(({ file, index, onRemove }: BatchFileItemProps) => {
+  const handleRemove = useCallback(() => {
+    onRemove(index)
+  }, [onRemove, index])
+
+  return (
+    <FileItem status={file.status}>
+      <FileAudio size={16} color="$secondary7" />
+      <Text
+        flex={1}
+        fontSize={13}
+        color="$secondary11"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
+        {file.name}
+      </Text>
+      {statusIcons[file.status]}
+      {file.status === 'pending' && (
+        <Button
+          size="$1"
+          circular
+          chromeless
+          onPress={handleRemove}
+          hoverStyle={{ backgroundColor: '$secondary4' }}
+        >
+          <X size={14} color="$secondary6" />
+        </Button>
+      )}
+    </FileItem>
+  )
+})
 
 interface BatchFilesListProps {
   files: BatchFile[]
@@ -113,30 +154,12 @@ export function BatchFilesList({
       <ScrollView maxHeight={maxHeight}>
         <YStack gap={8}>
           {files.map((file, index) => (
-            <FileItem key={`${file.path}-${index}`} status={file.status}>
-              <FileAudio size={16} color="$secondary7" />
-              <Text
-                flex={1}
-                fontSize={13}
-                color="$secondary11"
-                numberOfLines={1}
-                ellipsizeMode="middle"
-              >
-                {file.name}
-              </Text>
-              {statusIcons[file.status]}
-              {file.status === 'pending' && (
-                <Button
-                  size="$1"
-                  circular
-                  chromeless
-                  onPress={() => onRemoveFile(index)}
-                  hoverStyle={{ backgroundColor: '$secondary4' }}
-                >
-                  <X size={14} color="$secondary6" />
-                </Button>
-              )}
-            </FileItem>
+            <BatchFileItem
+              key={file.path}
+              file={file}
+              index={index}
+              onRemove={onRemoveFile}
+            />
           ))}
         </YStack>
       </ScrollView>

@@ -11,6 +11,7 @@ import {
 import { X, Settings, Check, ChevronDown, RotateCcw, Save } from '@tamagui/lucide-icons'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { useToastStore } from '../stores/useToastStore'
+import { Z_INDEX } from '../constants/zIndex'
 import type { UserSettings } from '../types'
 
 interface SettingsModalProps {
@@ -162,7 +163,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     fontSize: settings.fontSize,
   })
 
-  // Sync local state when modal opens
+  // Sync local state when modal opens or settings change
   useEffect(() => {
     if (open) {
       setLocalSettings({
@@ -178,7 +179,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         fontSize: settings.fontSize,
       })
     }
-  }, [open])
+  }, [open, settings])
 
   const updateLocalSetting = useCallback(
     <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
@@ -217,7 +218,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
       snapPoints={[90]}
       dismissOnSnapToBottom
-      zIndex={100000}
+      zIndex={Z_INDEX.MODAL}
     >
       <Sheet.Overlay backgroundColor="rgba(0,0,0,0.75)" />
       <Sheet.Frame backgroundColor="$secondary1" borderTopLeftRadius={16} borderTopRightRadius={16}>
@@ -267,7 +268,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 >
                   <Select.Value />
                 </Select.Trigger>
-                <Select.Content zIndex={200001}>
+                <Select.Content zIndex={Z_INDEX.SELECT_CONTENT_MODAL}>
                   <Select.Viewport>
                     <Select.Group>
                       {deviceOptions.map((option, index) => (
@@ -299,7 +300,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 >
                   <Select.Value />
                 </Select.Trigger>
-                <Select.Content zIndex={200001}>
+                <Select.Content zIndex={Z_INDEX.SELECT_CONTENT_MODAL}>
                   <Select.Viewport>
                     <Select.Group>
                       {quantizationOptions.map((option, index) => (
@@ -329,7 +330,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 >
                   <Select.Value />
                 </Select.Trigger>
-                <Select.Content zIndex={200001}>
+                <Select.Content zIndex={Z_INDEX.SELECT_CONTENT_MODAL}>
                   <Select.Viewport>
                     <Select.Group>
                       {languages.map((lang, index) => (
@@ -380,7 +381,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 >
                   <Select.Value />
                 </Select.Trigger>
-                <Select.Content zIndex={200001}>
+                <Select.Content zIndex={Z_INDEX.SELECT_CONTENT_MODAL}>
                   <Select.Viewport>
                     <Select.Group>
                       {fontSizeOptions.map((option, index) => (

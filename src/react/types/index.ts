@@ -1,5 +1,31 @@
 // ElectronAPI types matching the IPC contract from MIGRATION_GUIDE.md
 
+// Exportable result type for transcription export
+export interface ExportableResult {
+  text?: string;
+  segments?: TranscriptSegment[];
+  processing_time?: number;
+  language?: string;
+  device?: string;
+}
+
+// File filter for save dialogs
+export interface FileFilter {
+  name: string;
+  extensions: string[];
+}
+
+// Session data from Supabase
+export interface AuthSession {
+  user?: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+  };
+  access_token?: string;
+  expires_at?: number;
+}
+
 export interface ElectronAPI {
   // File Operations
   selectAudioFile(): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
@@ -13,8 +39,8 @@ export interface ElectronAPI {
   listBackends(): Promise<{ success: boolean; backends?: Record<string, Backend>; error?: string }>;
   transcribe(options: TranscribeOptions): Promise<TranscribeResult>;
   downloadModel(backend: string, modelName: string): Promise<{ success: boolean; error?: string }>;
-  exportResult(result: any, format: string, filePath: string): Promise<{ success: boolean; error?: string }>;
-  saveDialog(defaultName: string, filters: any[]): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+  exportResult(result: ExportableResult, format: string, filePath: string): Promise<{ success: boolean; error?: string }>;
+  saveDialog(defaultName: string, filters: FileFilter[]): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
 
   // HuggingFace Auth
   getHFToken(): Promise<{ success: boolean; token?: string }>;
@@ -27,7 +53,7 @@ export interface ElectronAPI {
   auth: {
     signInWithEmail(email: string): Promise<{ success: boolean; error?: string }>;
     signOut(): Promise<{ success: boolean; error?: string }>;
-    getSession(): Promise<{ success: boolean; session?: any; error?: string }>;
+    getSession(): Promise<{ success: boolean; session?: AuthSession | null; error?: string }>;
     checkModelAccess(modelName: string): Promise<{ success: boolean; hasAccess?: boolean; error?: string }>;
   };
 

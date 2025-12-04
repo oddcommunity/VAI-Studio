@@ -59,7 +59,7 @@ interface AppState {
   setCurrentAudioPlayer: (player: HTMLAudioElement | null) => void
   setProgress: (progress: number, message: string, stage?: 'downloading' | 'loading' | 'transcribing') => void
   setIsTranscribing: (transcribing: boolean) => void
-  setTranscriptionResults: (results: Array<{ backend: string; model: string; result: TranscribeResult }>) => void
+  setTranscriptionResults: (results: Array<{ backend: string; model: string; result: TranscribeResult }> | ((prev: Array<{ backend: string; model: string; result: TranscribeResult }>) => Array<{ backend: string; model: string; result: TranscribeResult }>)) => void
   setUIState: (state: { welcome?: boolean; loading?: boolean; results?: boolean }) => void
   reset: () => void
 }
@@ -143,7 +143,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   setIsTranscribing: (transcribing) => set({ isTranscribing: transcribing }),
 
-  setTranscriptionResults: (results) => set({ transcriptionResults: results }),
+  setTranscriptionResults: (results) => set((state) => ({
+    transcriptionResults: typeof results === 'function' ? results(state.transcriptionResults) : results
+  })),
 
   setUIState: (state) =>
     set((current) => ({

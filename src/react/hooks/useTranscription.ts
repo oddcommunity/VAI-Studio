@@ -8,7 +8,7 @@ import { transcriptionService } from '@services/transcription.service'
 import { useAppStore } from '@stores/useAppStore'
 import { useSettingsStore } from '@stores/useSettingsStore'
 import { useToastStore } from '@stores/useToastStore'
-import type { TranscribeOptions, TranscribeResult } from '../types'
+import type { TranscribeOptions, TranscribeResult, ExportableResult } from '../types'
 
 export function useTranscription() {
   const {
@@ -189,7 +189,7 @@ export function useTranscription() {
   ])
 
   const exportResult = useCallback(async (
-    result: any,
+    result: ExportableResult,
     backend: string,
     model: string,
     format: 'txt' | 'json' | 'srt' | 'vtt'

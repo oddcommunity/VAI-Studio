@@ -22,6 +22,7 @@ import {
 import { useAppStore } from '../stores/useAppStore'
 import { useToastStore } from '../stores/useToastStore'
 import { modelService } from '../services/model.service'
+import { Z_INDEX } from '../constants/zIndex'
 import type { Model } from '../types'
 
 const ModelCard = styled(YStack, {
@@ -178,7 +179,7 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
       onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
       snapPoints={[85]}
       dismissOnSnapToBottom
-      zIndex={100000}
+      zIndex={Z_INDEX.MODAL}
     >
       <Sheet.Overlay backgroundColor="rgba(0,0,0,0.75)" />
       <Sheet.Frame backgroundColor="$secondary1" borderTopLeftRadius={16} borderTopRightRadius={16}>
@@ -413,7 +414,7 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
                           )}
                         </XStack>
 
-                        {isDownloading && (
+                        {isDownloading && downloads[downloadKey] && (
                           <YStack gap={8}>
                             <Progress
                               value={downloads[downloadKey].progress}

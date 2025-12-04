@@ -16,6 +16,7 @@ import {
   LogOut,
   User,
 } from '@tamagui/lucide-icons'
+import { Z_INDEX } from '../constants/zIndex'
 import { useToastStore } from '../stores/useToastStore'
 import { authService } from '../services/auth.service'
 
@@ -164,7 +165,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
       onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
       snapPoints={[70]}
       dismissOnSnapToBottom
-      zIndex={100000}
+      zIndex={Z_INDEX.MODAL}
     >
       <Sheet.Overlay backgroundColor="rgba(0,0,0,0.75)" />
       <Sheet.Frame backgroundColor="$secondary1" borderTopLeftRadius={16} borderTopRightRadius={16}>
