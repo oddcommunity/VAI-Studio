@@ -1,25 +1,26 @@
-import { YStack, XStack, Text } from 'tamagui'
+import { YStack, XStack, Text, H1, H2, Card, Button } from '@odd-design-system/ui-components'
+import { ColorBlue500 } from '@odd-design-system/design-tokens'
 
 export function WelcomeMessage() {
   return (
     <YStack gap="$5" padding="$8" flex={1} justifyContent="center" alignItems="center">
       <YStack gap="$3" maxWidth={600} alignItems="center">
-        <Text fontSize={28} fontWeight="700" color="$white" textAlign="center">
+        <H1 color="$white" textAlign="center">
           Welcome to VAI Studio
-        </Text>
+        </H1>
         <Text fontSize={16} color="$gray7" textAlign="center" lineHeight={24}>
           A powerful tool for testing and comparing speech-to-text models locally
         </Text>
       </YStack>
 
       <YStack gap="$3" maxWidth={600} alignSelf="flex-start" marginTop="$6">
-        <Text fontSize={20} fontWeight="600" color="$white">
+        <H2 color="$white">
           Features:
-        </Text>
+        </H2>
 
         <YStack gap="$3">
           <XStack gap="$3" alignItems="flex-start">
-            <Text fontSize={18} color="$blue">
+            <Text fontSize={18} color={ColorBlue500}>
               •
             </Text>
             <YStack flex={1}>
@@ -30,7 +31,7 @@ export function WelcomeMessage() {
           </XStack>
 
           <XStack gap="$3" alignItems="flex-start">
-            <Text fontSize={18} color="$blue">
+            <Text fontSize={18} color={ColorBlue500}>
               •
             </Text>
             <YStack flex={1}>
@@ -41,7 +42,7 @@ export function WelcomeMessage() {
           </XStack>
 
           <XStack gap="$3" alignItems="flex-start">
-            <Text fontSize={18} color="$blue">
+            <Text fontSize={18} color={ColorBlue500}>
               •
             </Text>
             <YStack flex={1}>
@@ -52,7 +53,7 @@ export function WelcomeMessage() {
           </XStack>
 
           <XStack gap="$3" alignItems="flex-start">
-            <Text fontSize={18} color="$blue">
+            <Text fontSize={18} color={ColorBlue500}>
               •
             </Text>
             <YStack flex={1}>
@@ -63,7 +64,7 @@ export function WelcomeMessage() {
           </XStack>
 
           <XStack gap="$3" alignItems="flex-start">
-            <Text fontSize={18} color="$blue">
+            <Text fontSize={18} color={ColorBlue500}>
               •
             </Text>
             <YStack flex={1}>
