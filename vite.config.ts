@@ -42,7 +42,9 @@ export default defineConfig(({ mode }) => ({
       '@themes': path.resolve(__dirname, './src/react/themes'),
       // React Native Web aliases for Tamagui
       'react-native': 'react-native-web',
-      'react-native-svg': 'react-native-svg-web'
+      'react-native/Libraries/Utilities/codegenNativeComponent': path.resolve(__dirname, './src/react/shims/codegenNativeComponent.ts'),
+      'react-native-svg': 'react-native-svg-web',
+      'react-native-safe-area-context': path.resolve(__dirname, './src/react/shims/safe-area-context.ts'),
     },
     extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js']
   },
