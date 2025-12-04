@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
-import { TamaguiProvider, Theme, YStack } from 'tamagui'
+import { YStack } from 'tamagui'
+import { OddProvider } from '@odd-design-system/ui-components'
 import { VAIStudioFeatureScreen } from './features/screen'
-import { config } from './tamagui.config'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { ToastProvider } from './components/Toast'
+import { AppToastViewport } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
 import { LoadingOverlay } from './components/LoadingScreen'
 import { RecordingOverlayConnected } from './components/RecordingControls'
@@ -60,47 +60,45 @@ export function App() {
   // const handleOpenAuth = useCallback(() => setAuthOpen(true), [])
 
   return (
-    <TamaguiProvider config={config}>
-      <Theme name="vai_dark">
-        <ErrorBoundary>
-          <YStack flex={1} position="relative">
-            {/* Update Banner */}
-            <UpdateBanner />
+    <OddProvider defaultTheme="vai_dark">
+      <ErrorBoundary>
+        <YStack flex={1} position="relative">
+          {/* Update Banner */}
+          <UpdateBanner />
 
-            {/* Main Screen */}
-            <VAIStudioFeatureScreen
-              onAdvancedSettings={handleOpenSettings}
-              onManageModels={handleOpenModelManager}
-            />
+          {/* Main Screen */}
+          <VAIStudioFeatureScreen
+            onAdvancedSettings={handleOpenSettings}
+            onManageModels={handleOpenModelManager}
+          />
 
-            {/* Toast Notifications */}
-            <ToastProvider />
+          {/* Toast Viewport - OddProvider includes ToastProvider */}
+          <AppToastViewport />
 
-            {/* Loading Overlay */}
-            <LoadingOverlay
-              visible={showLoadingScreen || isTranscribing}
-              progress={progress}
-              message={progressMessage}
-              stage={progressStage}
-            />
+          {/* Loading Overlay */}
+          <LoadingOverlay
+            visible={showLoadingScreen || isTranscribing}
+            progress={progress}
+            message={progressMessage}
+            stage={progressStage}
+          />
 
-            {/* Recording Overlay */}
-            <RecordingOverlayConnected />
+          {/* Recording Overlay */}
+          <RecordingOverlayConnected />
 
-            {/* Modals - Lazy loaded */}
-            <Suspense fallback={null}>
-              {settingsOpen && <SettingsModal open={settingsOpen} onClose={handleCloseSettings} />}
-            </Suspense>
-            <Suspense fallback={null}>
-              {modelManagerOpen && <ModelManagerModal open={modelManagerOpen} onClose={handleCloseModelManager} />}
-            </Suspense>
-            <Suspense fallback={null}>
-              {authOpen && <AuthModal open={authOpen} onClose={handleCloseAuth} />}
-            </Suspense>
-          </YStack>
-        </ErrorBoundary>
-      </Theme>
-    </TamaguiProvider>
+          {/* Modals - Lazy loaded */}
+          <Suspense fallback={null}>
+            {settingsOpen && <SettingsModal open={settingsOpen} onClose={handleCloseSettings} />}
+          </Suspense>
+          <Suspense fallback={null}>
+            {modelManagerOpen && <ModelManagerModal open={modelManagerOpen} onClose={handleCloseModelManager} />}
+          </Suspense>
+          <Suspense fallback={null}>
+            {authOpen && <AuthModal open={authOpen} onClose={handleCloseAuth} />}
+          </Suspense>
+        </YStack>
+      </ErrorBoundary>
+    </OddProvider>
   )
 }
 

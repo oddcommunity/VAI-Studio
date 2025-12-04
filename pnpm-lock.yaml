@@ -41,6 +41,9 @@ importers:
       '@tamagui/themes':
         specifier: ^1.110.0
         version: 1.138.6(react-dom@18.3.1(react@18.3.1))(react-native@0.82.1(@babel/core@7.28.5)(@types/react@18.3.27)(react@18.3.1))(react@18.3.1)
+      '@tamagui/toast':
+        specifier: ^1.138.6
+        version: 1.138.6(react-dom@18.3.1(react@18.3.1))(react-native@0.82.1(@babel/core@7.28.5)(@types/react@18.3.27)(react@18.3.1))(react@18.3.1)
       electron-store:
         specifier: ^11.0.2
         version: 11.0.2

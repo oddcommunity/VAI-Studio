@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Theme } from 'tamagui'
-import { VAIStudioScreen } from '../components/VAIStudio'
+import { VAIStudioScreen, WelcomeScreen } from '../components/VAIStudio'
 import { ResultsPanel } from '../components/ResultsPanel'
-import { WelcomeScreen } from '../components/WelcomeScreen'
 import { useAppStore } from '../stores/useAppStore'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { useToastStore } from '../stores/useToastStore'
@@ -350,8 +349,7 @@ export function VAIStudioFeatureScreen({
   const hasResults = transcriptionResults.length > 0
 
   return (
-    <Theme name="vai_dark">
-      <VAIStudioScreen
+    <VAIStudioScreen
         models={models}
         selectedModel={selectedModel ?? undefined}
         onModelChange={setSelectedModel}
@@ -366,9 +364,6 @@ export function VAIStudioFeatureScreen({
         isTranscribing={isTranscribing}
         version="v3.0.1"
         releaseDate="Nov 26, 2025"
-        batchFiles={batchFiles}
-        onRemoveBatchFile={removeBatchFile}
-        onClearBatchFiles={clearBatchFiles}
       >
         {hasResults ? (
           <ResultsPanel
@@ -382,6 +377,5 @@ export function VAIStudioFeatureScreen({
           <WelcomeScreen version="v3.0.1" releaseDate="Nov 26, 2025" />
         )}
       </VAIStudioScreen>
-    </Theme>
   )
 }

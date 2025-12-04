@@ -1,5 +1,5 @@
-// WelcomeScreen component
-import { YStack, XStack, Text, H1 } from 'tamagui'
+import React from 'react'
+import { YStack, XStack, Text, H1 } from '@odd-design-system/ui-components'
 import { CheckCircleIcon } from './Icons'
 
 export interface WelcomeScreenProps {

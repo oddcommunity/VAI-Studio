@@ -21,14 +21,15 @@
  * ```
  */
 
-export { VAIStudio, VAIStudioScreen } from './VAIStudio'
-export type { VAIStudioProps } from './VAIStudio'
+// VAI Studio core components (from design system)
+export { VAIStudio, VAIStudioScreen } from './VAIStudio/VAIStudio'
+export type { VAIStudioProps } from './VAIStudio/VAIStudio'
 
-export { Sidebar } from './Sidebar'
-export type { SidebarProps, Model } from './Sidebar'
+export { Sidebar } from './VAIStudio/Sidebar'
+export type { SidebarProps, Model } from './VAIStudio/Sidebar'
 
-export { WelcomeScreen } from './WelcomeScreen'
-export type { WelcomeScreenProps } from './WelcomeScreen'
+export { WelcomeScreen } from './VAIStudio/WelcomeScreen'
+export type { WelcomeScreenProps } from './VAIStudio/WelcomeScreen'
 
 export {
   GraphicEqIcon,
@@ -39,10 +40,10 @@ export {
   FolderIcon,
   CheckCircleIcon,
   ChevronDownIcon,
-} from './Icons'
+} from './VAIStudio/Icons'
 
 // Toast notifications
-export { Toast, ToastProvider } from './Toast'
+export { AppToastViewport } from './Toast'
 
 // Loading states
 export { LoadingScreen, LoadingOverlay } from './LoadingScreen'

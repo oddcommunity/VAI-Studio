@@ -1,14 +1,12 @@
-import { useCallback, useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import {
   YStack,
   XStack,
   Text,
   Button,
   H2,
-  Checkbox,
-  Select,
-  useTheme,
-} from 'tamagui'
+} from '@odd-design-system/ui-components'
+import { Checkbox, Select, useTheme } from 'tamagui'
 import { Check, ChevronDown } from '@tamagui/lucide-icons'
 import {
   GraphicEqIcon,
@@ -18,9 +16,6 @@ import {
   SettingsIcon,
   FolderIcon,
 } from './Icons'
-import { BatchFilesList } from './BatchFilesList'
-import { Z_INDEX } from '../constants/zIndex'
-import type { BatchFile } from '../types'
 
 export interface Model {
   id: string
@@ -40,9 +35,6 @@ export interface SidebarProps {
   compareMode?: boolean
   onCompareModeChange?: (enabled: boolean) => void
   isTranscribing?: boolean
-  batchFiles?: BatchFile[]
-  onRemoveBatchFile?: (index: number) => void
-  onClearBatchFiles?: () => void
 }
 
 export function Sidebar({
@@ -58,9 +50,6 @@ export function Sidebar({
   compareMode = false,
   onCompareModeChange,
   isTranscribing = false,
-  batchFiles = [],
-  onRemoveBatchFile,
-  onClearBatchFiles,
 }: SidebarProps) {
   const theme = useTheme()
   const [isMounted, setIsMounted] = useState(false)
@@ -150,9 +139,9 @@ export function Sidebar({
                 </Button>
                 <Button
                   flex={1}
-                  backgroundColor="$recording"
-                  hoverStyle={{ opacity: 0.9 }}
-                  pressStyle={{ opacity: 0.8 }}
+                  backgroundColor="hsl(0, 84%, 60%)"
+                  hoverStyle={{ backgroundColor: 'hsl(0, 84%, 65%)' }}
+                  pressStyle={{ backgroundColor: 'hsl(0, 84%, 70%)' }}
                   paddingHorizontal={16}
                   paddingVertical={16}
                   borderRadius={8}
@@ -199,16 +188,6 @@ export function Sidebar({
             </YStack>
           </YStack>
 
-          {/* Batch Files List */}
-          {batchFiles.length > 0 && onRemoveBatchFile && onClearBatchFiles && (
-            <BatchFilesList
-              files={batchFiles}
-              onRemoveFile={onRemoveBatchFile}
-              onClearAll={onClearBatchFiles}
-              maxHeight={150}
-            />
-          )}
-
           {/* Model Section */}
           <YStack gap={12}>
             <Text
@@ -249,7 +228,7 @@ export function Sidebar({
                     fontFamily="$heading"
                   />
                 </Select.Trigger>
-                <Select.Content zIndex={Z_INDEX.SELECT_CONTENT}>
+                <Select.Content zIndex={200000}>
                   <Select.ScrollUpButton />
                   <Select.Viewport>
                     <Select.Group>
@@ -345,9 +324,9 @@ export function Sidebar({
         {/* Transcribe Button */}
         <Button
           width="100%"
-          backgroundColor="$cta"
-          hoverStyle={{ backgroundColor: '$ctaHover' }}
-          pressStyle={{ backgroundColor: '$ctaPress' }}
+          backgroundColor="hsl(28, 100%, 58%)"
+          hoverStyle={{ backgroundColor: 'hsl(28, 100%, 62%)' }}
+          pressStyle={{ backgroundColor: 'hsl(28, 100%, 66%)' }}
           paddingHorizontal={16}
           paddingVertical={18}
           borderRadius={8}

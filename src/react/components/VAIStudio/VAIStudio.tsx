@@ -1,8 +1,8 @@
-import { ReactNode } from 'react'
-import { XStack, YStack, ScrollView } from 'tamagui'
-import { Sidebar, Model } from './Sidebar'
-import { WelcomeScreen } from './WelcomeScreen'
-import type { BatchFile } from '../types'
+import React, { ReactNode } from 'react'
+import { XStack, YStack } from '@odd-design-system/ui-components'
+import { ScrollView } from 'tamagui'
+import { Sidebar, SidebarProps, Model } from './Sidebar'
+import { WelcomeScreen, WelcomeScreenProps } from './WelcomeScreen'
 
 export interface VAIStudioProps {
   /** Available models for selection */
@@ -35,12 +35,6 @@ export interface VAIStudioProps {
   releaseDate?: string
   /** Custom content to render instead of WelcomeScreen */
   children?: ReactNode
-  /** Batch files for batch processing */
-  batchFiles?: BatchFile[]
-  /** Callback to remove a file from batch */
-  onRemoveBatchFile?: (index: number) => void
-  /** Callback to clear all batch files */
-  onClearBatchFiles?: () => void
 }
 
 export function VAIStudio({
@@ -59,9 +53,6 @@ export function VAIStudio({
   version = 'v3.0.1',
   releaseDate = 'Nov 26, 2025',
   children,
-  batchFiles = [],
-  onRemoveBatchFile,
-  onClearBatchFiles,
 }: VAIStudioProps) {
   return (
     <XStack
@@ -103,9 +94,6 @@ export function VAIStudio({
             compareMode={compareMode}
             onCompareModeChange={onCompareModeChange}
             isTranscribing={isTranscribing}
-            batchFiles={batchFiles}
-            onRemoveBatchFile={onRemoveBatchFile}
-            onClearBatchFiles={onClearBatchFiles}
           />
         </ScrollView>
       </YStack>
