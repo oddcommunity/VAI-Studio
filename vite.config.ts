@@ -45,6 +45,10 @@ export default defineConfig(({ mode }) => ({
       'react-native/Libraries/Utilities/codegenNativeComponent': path.resolve(__dirname, './src/react/shims/codegenNativeComponent.ts'),
       'react-native-svg': 'react-native-svg-web',
       'react-native-safe-area-context': path.resolve(__dirname, './src/react/shims/safe-area-context.ts'),
+      // Odd design system - use source files directly for better Vite resolution
+      '@odd-design-system/ui-components/tamagui.config': path.resolve(__dirname, './odd-design-system/packages/ui-components/tamagui.config.ts'),
+      // Use browser crypto API instead of Node.js crypto
+      'crypto': path.resolve(__dirname, './src/react/shims/crypto.ts'),
     },
     extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js']
   },
@@ -57,6 +61,11 @@ export default defineConfig(({ mode }) => ({
   // Optimize for Electron
   optimizeDeps: {
     exclude: ['electron']
+  },
+
+  // Define Node.js globals for browser compatibility
+  define: {
+    'process.env': {}
   },
 
   // Production-only settings

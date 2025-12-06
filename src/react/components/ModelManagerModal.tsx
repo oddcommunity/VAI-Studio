@@ -9,7 +9,7 @@ import {
   ScrollView,
   Tabs,
   styled,
-} from 'tamagui'
+} from '@odd-design-system/ui-components'
 import {
   X,
   FolderOpen,

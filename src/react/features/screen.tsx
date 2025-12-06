@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Theme } from 'tamagui'
-import { VAIStudioScreen, WelcomeScreen } from '../components/VAIStudio'
+import { Theme } from '@odd-design-system/ui-components'
+import { VAIStudioScreen, WelcomeScreen, type ModelGroup } from '../components/VAIStudio'
 import { ResultsPanel } from '../components/ResultsPanel'
 import { useAppStore } from '../stores/useAppStore'
 import { useSettingsStore } from '../stores/useSettingsStore'
@@ -33,7 +33,6 @@ export function VAIStudioFeatureScreen({
     isTranscribing,
     setIsTranscribing,
     isRecording,
-    setIsRecording,
     batchFiles,
     addBatchFiles,
     removeBatchFile,
@@ -88,6 +87,23 @@ export function VAIStudioFeatureScreen({
     return modelList
   }, [backends])
 
+  // Convert backends to grouped model list for UI
+  const modelGroups = useMemo((): ModelGroup[] => {
+    return Object.entries(backends)
+      .filter(([_, backend]) => backend.available)
+      .map(([backendName, backend]) => ({
+        backend: backendName,
+        displayName: backendName.toUpperCase(),
+        provider: backendName,
+        models: backend.models.map((model) => ({
+          id: JSON.stringify({ backend: backendName, model: model.name }),
+          name: model.name,
+          size: model.size,
+          installed: model.installed,
+        })),
+      }))
+  }, [backends])
+
   // File selection handler
   const handleSelectFile = useCallback(async () => {
     try {
@@ -116,27 +132,12 @@ export function VAIStudioFeatureScreen({
     }
   }, [addBatchFiles, showToast])
 
-  // Audio recording handler
-  const handleRecordAudio = useCallback(async () => {
-    if (isRecording) {
-      // Stop recording
-      try {
-        setIsRecording(false)
-        showToast('Recording stopped', 'success', 2000)
-      } catch (error) {
-        showToast('Failed to stop recording', 'error', 3000)
-      }
-    } else {
-      // Start recording
-      try {
-        setIsRecording(true)
-        showToast('Recording started', 'info', 2000)
-      } catch (error) {
-        setIsRecording(false)
-        showToast('Failed to start recording', 'error', 3000)
-      }
-    }
-  }, [isRecording, setIsRecording, showToast])
+  // Audio recording handler - triggers the recording overlay
+  const handleRecordAudio = useCallback(() => {
+    // Set trigger to open the recording overlay and start recording
+    const { setTriggerRecording } = useAppStore.getState()
+    setTriggerRecording(true)
+  }, [])
 
   // Helper to transcribe a single file with a single model
   const transcribeSingleFile = useCallback(
@@ -316,7 +317,7 @@ export function VAIStudioFeatureScreen({
 
   // Export result handler
   const handleExportResult = useCallback(
-    async (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt') => {
+    async (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt' | 'pdf') => {
       try {
         const defaultName = `transcription_${result.model}.${format}`
         const dialogResult = await electronBridge.saveDialog(defaultName, [
@@ -350,32 +351,36 @@ export function VAIStudioFeatureScreen({
 
   return (
     <VAIStudioScreen
-        models={models}
-        selectedModel={selectedModel ?? undefined}
-        onModelChange={setSelectedModel}
-        onSelectFile={handleSelectFile}
-        onRecordAudio={handleRecordAudio}
-        onAddMultipleFiles={handleAddMultipleFiles}
-        onTranscribe={handleTranscribe}
-        onAdvancedSettings={handleAdvancedSettings}
-        onManageModels={handleManageModels}
-        compareMode={comparisonMode}
-        onCompareModeChange={setComparisonMode}
-        isTranscribing={isTranscribing}
-        version="v3.0.1"
-        releaseDate="Nov 26, 2025"
-      >
-        {hasResults ? (
-          <ResultsPanel
-            results={transcriptionResults}
-            comparisonMode={comparisonMode}
-            onClearResults={handleClearResults}
-            onExport={handleExportResult}
-            selectedFile={selectedFile ?? undefined}
-          />
-        ) : (
-          <WelcomeScreen version="v3.0.1" releaseDate="Nov 26, 2025" />
-        )}
-      </VAIStudioScreen>
+      models={models}
+      modelGroups={modelGroups}
+      selectedModel={selectedModel ?? undefined}
+      onModelChange={setSelectedModel}
+      selectedModels={comparisonModels}
+      onModelsChange={setComparisonModels}
+      onSelectFile={handleSelectFile}
+      onRecordAudio={handleRecordAudio}
+      onAddMultipleFiles={handleAddMultipleFiles}
+      onTranscribe={handleTranscribe}
+      onAdvancedSettings={handleAdvancedSettings}
+      onManageModels={handleManageModels}
+      compareMode={comparisonMode}
+      onCompareModeChange={setComparisonMode}
+      isTranscribing={isTranscribing}
+      version="v3.0.1"
+      releaseDate="Nov 26, 2025"
+      selectedFile={selectedFile ?? undefined}
+    >
+      {hasResults ? (
+        <ResultsPanel
+          results={transcriptionResults}
+          comparisonMode={comparisonMode}
+          onClearResults={handleClearResults}
+          onExport={handleExportResult}
+          selectedFile={selectedFile ?? undefined}
+        />
+      ) : (
+        <WelcomeScreen version="v3.0.1" releaseDate="Nov 26, 2025" />
+      )}
+    </VAIStudioScreen>
   )
 }

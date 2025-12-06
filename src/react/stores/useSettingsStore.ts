@@ -35,6 +35,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       enableWordTimestamps: updates.enableWordTimestamps ?? current.enableWordTimestamps,
       modelCachePath: updates.modelCachePath ?? current.modelCachePath,
       exportPath: updates.exportPath ?? current.exportPath,
+      recordingsPath: updates.recordingsPath ?? current.recordingsPath,
+      pdfExportPath: updates.pdfExportPath ?? current.pdfExportPath,
       autoScroll: updates.autoScroll ?? current.autoScroll,
       showNotifications: updates.showNotifications ?? current.showNotifications,
       fontSize: updates.fontSize ?? current.fontSize

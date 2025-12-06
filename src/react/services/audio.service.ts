@@ -60,14 +60,35 @@ export class AudioService {
    * Start audio recording
    */
   async startRecording(onTimeUpdate?: (seconds: number) => void): Promise<void> {
+    console.log('[AudioService] startRecording called')
+
     if (!this.isRecordingSupported()) {
+      console.error('[AudioService] Recording not supported')
       throw new Error('Audio recording is not supported in this browser')
     }
 
     let stream: MediaStream | null = null
 
     try {
+      // CRITICAL FIX: Request macOS microphone permission first
+      console.log('[AudioService] Requesting macOS microphone permission...')
+      const permissionResult = await electronBridge.requestMicrophonePermission()
+      console.log('[AudioService] Permission result:', permissionResult)
+
+      if (!permissionResult.success) {
+        throw new Error(permissionResult.error || 'Failed to request microphone permission')
+      }
+
+      if (!permissionResult.granted) {
+        const errorMessage = permissionResult.needsSystemPreferences
+          ? 'Microphone access denied. Please enable it in System Preferences > Privacy & Security > Microphone, then restart VAI Studio.'
+          : 'Microphone access denied. Please grant permission to use the microphone.'
+        throw new Error(errorMessage)
+      }
+
+      console.log('[AudioService] macOS permission granted, requesting browser media access...')
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      console.log('[AudioService] Browser microphone access granted')
 
       // Determine supported MIME type
       let mimeType = 'audio/webm'
@@ -78,6 +99,7 @@ export class AudioService {
       } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
         mimeType = 'audio/mp4'
       }
+      console.log('[AudioService] Using MIME type:', mimeType)
 
       this.audioRecorder = new MediaRecorder(stream, { mimeType })
       this.recordingChunks = []
@@ -89,7 +111,9 @@ export class AudioService {
         }
       }
 
+      console.log('[AudioService] Starting MediaRecorder...')
       this.audioRecorder.start()
+      console.log('[AudioService] MediaRecorder started successfully')
 
       // Start timer
       if (onTimeUpdate) {

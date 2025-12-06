@@ -37,6 +37,10 @@ class ElectronBridge {
     return this.ensureAPI().selectMultipleAudioFiles()
   }
 
+  async selectDirectory(options?: { defaultPath?: string; title?: string }) {
+    return this.ensureAPI().selectDirectory(options)
+  }
+
   async selectFromRecordings() {
     return this.ensureAPI().selectFromRecordings()
   }
@@ -51,6 +55,10 @@ class ElectronBridge {
 
   async saveRecording(data: { blob: ArrayBuffer; mimeType: string; duration: number }) {
     return this.ensureAPI().saveRecording(data)
+  }
+
+  async requestMicrophonePermission() {
+    return this.ensureAPI().requestMicrophonePermission()
   }
 
   // Transcription
@@ -131,6 +139,11 @@ class ElectronBridge {
 
   async openLicenseFile() {
     return this.ensureAPI().openLicenseFile()
+  }
+
+  // Clipboard
+  copyToClipboard(text: string): boolean {
+    return this.ensureAPI().copyToClipboard(text)
   }
 }
 

@@ -154,10 +154,10 @@ class Wav2VecBERTBackend(STTBackend):
                 sf.write(temp_wav_path, audio_data, sample_rate)
 
             try:
-                # Transcribe with timestamps enabled for long audio support
+                # Transcribe with word-level timestamps (CTC models require 'word' or 'char')
                 report_progress(50, 'Transcribing audio...', 'transcribing')
                 print(f"Transcribing with Wav2Vec2 {model_name}...")
-                result = pipe(temp_wav_path, return_timestamps=True)
+                result = pipe(temp_wav_path, return_timestamps='word')
 
                 processing_time = time.time() - start_time
 
@@ -168,6 +168,7 @@ class Wav2VecBERTBackend(STTBackend):
                 segments = result.get('chunks', []) if isinstance(result, dict) else []
 
                 return {
+                    'success': True,
                     'text': text.strip(),
                     'processing_time': round(processing_time, 2),
                     'segments': segments,
@@ -183,6 +184,7 @@ class Wav2VecBERTBackend(STTBackend):
         except Exception as e:
             processing_time = time.time() - start_time
             return {
+                'success': False,
                 'text': '',
                 'processing_time': round(processing_time, 2),
                 'error': str(e),

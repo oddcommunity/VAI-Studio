@@ -1,31 +1,55 @@
 /**
- * Global Styles for VAI Studio React App
- * Minimal global styles - most styling handled by Tamagui
+ * Minimal CSS for web entry point
+ * All component styling is handled by Tamagui
+ *
+ * EXCEPTION: Scrollbar visibility requires CSS because it's browser-level,
+ * not React/Tamagui level. macOS/Chromium hides scrollbars by default.
  */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
+/* Basic web reset for root element */
 html,
 body,
 #root {
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ===========================================
+   FORCE SCROLLBAR ALWAYS VISIBLE
+   This is CSS because scrollbars are rendered by the browser, not React.
+   Tamagui cannot control browser scrollbar visibility.
+   Using !important to override any inline styles from Tamagui.
+   =========================================== */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.4) rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Electron-specific: Make header draggable */
+*::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 4px !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border-radius: 4px !important;
+  min-height: 30px !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Electron-specific: Window drag regions (cannot be done in React/Tamagui) */
 .electron-drag-region {
   -webkit-app-region: drag;
   app-region: drag;
@@ -36,27 +60,4 @@ body {
   app-region: no-drag;
 }
 
-/* Scrollbar styling for dark theme */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(215, 15%, 15%);
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(215, 15%, 35%);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(215, 15%, 45%);
-}
-
-/* Selection color */
-::selection {
-  background-color: hsl(215, 83%, 50%);
-  color: white;
-}
+/* Old scrollbar CSS removed - now using global * selector above */

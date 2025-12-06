@@ -7,4 +7,7 @@ export type { SidebarProps, Model } from './Sidebar'
 export { WelcomeScreen } from './WelcomeScreen'
 export type { WelcomeScreenProps } from './WelcomeScreen'
 
+export { GroupedModelSelector } from './GroupedModelSelector'
+export type { ModelGroup, ModelItem, GroupedModelSelectorProps } from './GroupedModelSelector'
+
 export * from './Icons'

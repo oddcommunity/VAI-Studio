@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
-import { YStack } from 'tamagui'
-import { OddProvider } from '@odd-design-system/ui-components'
+import { YStack } from '@odd-design-system/ui-components'
+import { OddProvider } from './providers/OddProvider'
 import { VAIStudioFeatureScreen } from './features/screen'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AppToastViewport } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
 import { LoadingOverlay } from './components/LoadingScreen'
 import { RecordingOverlayConnected } from './components/RecordingControls'
+import { DraggableHeader } from './components/DraggableHeader'
 import { useAppStore } from './stores/useAppStore'
 import { electronBridge } from './services/electron.bridge'
 
@@ -62,7 +63,10 @@ export function App() {
   return (
     <OddProvider defaultTheme="vai_dark">
       <ErrorBoundary>
-        <YStack flex={1} position="relative">
+        <YStack flex={1} height="100%" position="relative">
+          {/* Draggable Header for Electron */}
+          <DraggableHeader />
+
           {/* Update Banner */}
           <UpdateBanner />
 

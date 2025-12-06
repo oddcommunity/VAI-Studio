@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, clipboard } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Select multiple audio files
   selectMultipleAudioFiles: () => ipcRenderer.invoke('select-multiple-audio-files'),
+
+  // Select directory
+  selectDirectory: (options = {}) => ipcRenderer.invoke('select-directory', options),
 
   // Get file info
   getFileInfo: (filePath) => ipcRenderer.invoke('get-file-info', { filePath }),
@@ -59,6 +62,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   testHFToken: (token) => ipcRenderer.invoke('test-hf-token', token),
 
   // Voice recording
+  requestMicrophonePermission: () => ipcRenderer.invoke('request-microphone-permission'),
   saveRecording: (recordingData) => {
     // recordingData.blob is already an ArrayBuffer from app.js
     return ipcRenderer.invoke('save-recording', recordingData);
@@ -80,6 +84,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => {
       ipcRenderer.removeListener('update-ready', subscription);
     };
+  },
+
+  // Clipboard
+  copyToClipboard: (text) => {
+    clipboard.writeText(text);
+    return true;
   },
 });
 

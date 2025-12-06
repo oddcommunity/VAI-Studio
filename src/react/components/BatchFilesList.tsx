@@ -1,6 +1,6 @@
 // BatchFilesList component - displays files in batch queue
 import { memo, useCallback } from 'react'
-import { YStack, XStack, Text, Button, ScrollView, styled } from 'tamagui'
+import { YStack, XStack, Text, Button, ScrollView, styled } from '@odd-design-system/ui-components'
 import { X, FileAudio, CheckCircle, AlertCircle, Loader } from '@tamagui/lucide-icons'
 import type { BatchFile } from '../types'
 

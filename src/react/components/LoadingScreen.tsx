@@ -1,5 +1,5 @@
 // LoadingScreen component
-import { YStack, Text, Progress, Spinner, styled } from 'tamagui'
+import { YStack, Text, Progress, Spinner, styled } from '@odd-design-system/ui-components'
 import { useAppStore } from '../stores/useAppStore'
 import { Z_INDEX } from '../constants/zIndex'
 
@@ -89,6 +89,18 @@ export function LoadingScreen({ message, progress, stage }: LoadingScreenProps) 
               {Math.round(displayProgress)}%
             </Text>
           </YStack>
+        )}
+
+        {(displayStage === 'loading' || displayStage === 'downloading') && (
+          <Text
+            fontSize={12}
+            color="$secondary5"
+            textAlign="center"
+            lineHeight={18}
+            maxWidth={340}
+          >
+            Larger models take longer to load. If you're using a large model for the first time, this may take a few minutes while your computer processes it.
+          </Text>
         )}
 
         {displayStage && (

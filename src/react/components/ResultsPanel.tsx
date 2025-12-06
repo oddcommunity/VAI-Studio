@@ -1,7 +1,6 @@
 // ResultsPanel component
 import { useCallback } from 'react'
-import { YStack, XStack, Text, Button, H2 } from '@odd-design-system/ui-components'
-import { ScrollView, styled } from 'tamagui'
+import { YStack, XStack, Text, Button, H2, ScrollView, styled } from '@odd-design-system/ui-components'
 import { FileAudio, Trash2, LayoutGrid } from '@tamagui/lucide-icons'
 import { ResultCard } from './ResultCard'
 import { sanitizeFileName } from '../utils/sanitize'
@@ -56,20 +55,20 @@ export interface ResultsPanelProps {
   results: TranscriptionResultItem[]
   comparisonMode?: boolean
   onClearResults?: () => void
-  onExport?: (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt') => void
+  onExport?: (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt' | 'pdf') => void
   selectedFile?: string | null
 }
 
 // Memoized wrapper for ResultCard to prevent inline function recreation
 interface MemoizedResultCardProps {
   item: TranscriptionResultItem
-  onExport?: (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt') => void
+  onExport?: (result: TranscriptionResultItem, format: 'txt' | 'json' | 'srt' | 'vtt' | 'pdf') => void
   defaultExpanded: boolean
 }
 
 function MemoizedResultCard({ item, onExport, defaultExpanded }: MemoizedResultCardProps) {
   const handleExport = useCallback(
-    (format: 'txt' | 'json' | 'srt' | 'vtt') => {
+    (format: 'txt' | 'json' | 'srt' | 'vtt' | 'pdf') => {
       onExport?.(item, format)
     },
     [onExport, item]

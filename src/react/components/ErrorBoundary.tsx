@@ -1,5 +1,5 @@
 import { Component, ReactNode } from 'react'
-import { YStack, XStack, Text, Button, H2 } from 'tamagui'
+import { YStack, XStack, Text, Button, H2 } from '@odd-design-system/ui-components'
 import { AlertTriangle, RefreshCw } from '@tamagui/lucide-icons'
 
 interface Props {

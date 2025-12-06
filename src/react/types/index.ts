@@ -30,10 +30,12 @@ export interface ElectronAPI {
   // File Operations
   selectAudioFile(): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
   selectMultipleAudioFiles(): Promise<{ success: boolean; canceled?: boolean; filePaths?: string[] }>;
+  selectDirectory(options?: { defaultPath?: string; title?: string }): Promise<{ success: boolean; canceled?: boolean; directoryPath?: string }>;
   selectFromRecordings(): Promise<{ success: boolean; canceled?: boolean; filePath?: string; fileName?: string; duration?: number }>;
   getFileInfo(filePath: string): Promise<{ success: boolean; fileName?: string; fileSizeMB?: string }>;
   showItemInFolder(filePath: string): void;
   saveRecording(data: { blob: ArrayBuffer; mimeType: string; duration: number }): Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }>;
+  requestMicrophonePermission(): Promise<{ success: boolean; granted?: boolean; needsSystemPreferences?: boolean; message?: string; error?: string }>;
 
   // Transcription
   listBackends(): Promise<{ success: boolean; backends?: Record<string, Backend>; error?: string }>;
@@ -67,6 +69,9 @@ export interface ElectronAPI {
   // External Links
   openExternal(url: string): Promise<void>;
   openLicenseFile(): Promise<void>;
+
+  // Clipboard
+  copyToClipboard(text: string): boolean;
 }
 
 // Extend Window interface
@@ -147,6 +152,8 @@ export interface UserSettings {
   enableWordTimestamps: boolean;
   modelCachePath: string;
   exportPath: string;
+  recordingsPath: string;
+  pdfExportPath: string;
   autoScroll: boolean;
   showNotifications: boolean;
   fontSize: 'small' | 'medium' | 'large';

@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { YStack, XStack, Text, Button, H3 } from '@odd-design-system/ui-components'
-import { Input, Sheet, Spinner } from 'tamagui'
+import { YStack, XStack, Text, Button, H3, Input, Sheet, Spinner } from '@odd-design-system/ui-components'
 import {
   X,
   Key,

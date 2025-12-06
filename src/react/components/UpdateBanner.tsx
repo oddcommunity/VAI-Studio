@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { XStack, Text, Button, styled, AnimatePresence } from 'tamagui'
+import { XStack, Text, Button, styled, AnimatePresence } from '@odd-design-system/ui-components'
 import { Download, X, RefreshCw } from '@tamagui/lucide-icons'
 import { electronBridge } from '../services/electron.bridge'
 import { Z_INDEX } from '../constants/zIndex'

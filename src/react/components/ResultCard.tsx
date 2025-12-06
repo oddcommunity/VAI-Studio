@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
-import { YStack, XStack, Text, Button, Card } from '@odd-design-system/ui-components'
-import { ScrollView, styled, Popover } from 'tamagui'
+import { useState, useCallback, useMemo } from 'react'
+import { YStack, XStack, Text, Button } from '@odd-design-system/ui-components'
+import { ScrollView, styled, Popover } from '@odd-design-system/ui-components'
 import {
   Copy,
   Check,
@@ -14,13 +14,24 @@ import {
   FileText,
   FileJson,
   Subtitles,
+  FileType,
 } from '@tamagui/lucide-icons'
 import type { TranscribeResult } from '../types'
 import { useToastStore } from '../stores/useToastStore'
+import { useSettingsStore } from '../stores/useSettingsStore'
+import { electronBridge } from '../services/electron.bridge'
 
-type ExportFormat = 'txt' | 'json' | 'srt' | 'vtt'
+// Font size mapping
+const FONT_SIZE_MAP = {
+  small: { text: 13, lineHeight: 20, segment: 11 },
+  medium: { text: 15, lineHeight: 24, segment: 13 },
+  large: { text: 17, lineHeight: 28, segment: 15 },
+} as const
+
+type ExportFormat = 'txt' | 'json' | 'srt' | 'vtt' | 'pdf'
 
 const formatOptions: { format: ExportFormat; label: string; icon: React.ReactNode }[] = [
+  { format: 'pdf', label: 'PDF Document (.pdf)', icon: <FileType size={14} color="$secondary7" /> },
   { format: 'txt', label: 'Plain Text (.txt)', icon: <FileText size={14} color="$secondary7" /> },
   { format: 'json', label: 'JSON (.json)', icon: <FileJson size={14} color="$secondary7" /> },
   { format: 'srt', label: 'SubRip (.srt)', icon: <Subtitles size={14} color="$secondary7" /> },
@@ -85,6 +96,7 @@ const ExportMenuItem = styled(XStack, {
   gap: 8,
   borderRadius: 4,
   cursor: 'pointer',
+  userSelect: 'none',
   hoverStyle: {
     backgroundColor: '$secondary3',
   },
@@ -112,6 +124,16 @@ export function ResultCard({
   const [copied, setCopied] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const { showToast } = useToastStore()
+  // Use selector for fontSize to ensure re-renders on change
+  const fontSize = useSettingsStore((state) => state.fontSize)
+
+  // Get font sizes based on setting with proper type safety
+  const fontSizes = useMemo(() => {
+    const validFontSize = (fontSize === 'small' || fontSize === 'medium' || fontSize === 'large')
+      ? fontSize
+      : 'medium'
+    return FONT_SIZE_MAP[validFontSize]
+  }, [fontSize])
 
   const handleExport = useCallback((format: ExportFormat) => {
     setExportOpen(false)
@@ -119,14 +141,30 @@ export function ResultCard({
   }, [onExport])
 
   const handleCopy = useCallback(async () => {
-    if (!result.text) return
+    if (!result.text) {
+      showToast('No text to copy', 'error', 3000)
+      return
+    }
 
     try {
-      await navigator.clipboard.writeText(result.text)
-      setCopied(true)
-      showToast('Copied to clipboard', 'success', 2000)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
+      // Use Electron clipboard API if available, fallback to navigator.clipboard
+      if (electronBridge.isElectron()) {
+        const success = electronBridge.copyToClipboard(result.text)
+        if (success) {
+          setCopied(true)
+          showToast('Copied to clipboard', 'success', 2000)
+          setTimeout(() => setCopied(false), 2000)
+        } else {
+          showToast('Failed to copy', 'error', 3000)
+        }
+      } else {
+        await navigator.clipboard.writeText(result.text)
+        setCopied(true)
+        showToast('Copied to clipboard', 'success', 2000)
+        setTimeout(() => setCopied(false), 2000)
+      }
+    } catch (err) {
+      console.error('Copy failed:', err)
       showToast('Failed to copy', 'error', 3000)
     }
   }, [result.text, showToast])
@@ -209,17 +247,21 @@ export function ResultCard({
         </XStack>
 
         <XStack alignItems="center" gap={8}>
-          <Button
-            size="$2"
-            chromeless
-            onPress={handleCopy}
+          <XStack
+            alignItems="center"
+            gap={6}
+            paddingHorizontal={8}
+            paddingVertical={4}
+            borderRadius={4}
+            cursor="pointer"
             hoverStyle={{ backgroundColor: '$secondary3' }}
-            icon={copied ? <Check size={16} color="$success" /> : <Copy size={16} color="$secondary7" />}
+            onPress={handleCopy}
           >
+            {copied ? <Check size={16} color="$success" /> : <Copy size={16} color="$secondary7" />}
             <Text fontSize={12} color="$secondary9">
               {copied ? 'Copied!' : 'Copy'}
             </Text>
-          </Button>
+          </XStack>
 
           {onExport && (
             <Popover open={exportOpen} onOpenChange={setExportOpen} placement="bottom-end">
@@ -227,6 +269,7 @@ export function ResultCard({
                 <Button
                   size="$2"
                   chromeless
+                  onPress={() => setExportOpen(!exportOpen)}
                   hoverStyle={{ backgroundColor: '$secondary3' }}
                   icon={<Download size={16} color="$secondary7" />}
                 >
@@ -254,6 +297,8 @@ export function ResultCard({
                     <ExportMenuItem
                       key={option.format}
                       onPress={() => handleExport(option.format)}
+                      role="button"
+                      tabIndex={0}
                     >
                       {option.icon}
                       <Text fontSize={13} color="$secondary11">
@@ -285,9 +330,15 @@ export function ResultCard({
       {expanded && (
         <CardContent>
           <ScrollView maxHeight={400}>
-            <TranscriptText selectable>
+            <Text
+              fontSize={fontSizes.text}
+              lineHeight={fontSizes.lineHeight}
+              color="$secondary11"
+              fontFamily="$body"
+              selectable
+            >
               {result.text || 'No transcription text available'}
-            </TranscriptText>
+            </Text>
           </ScrollView>
 
           {result.segments && result.segments.length > 0 && (
@@ -301,7 +352,7 @@ export function ResultCard({
                     <Text fontSize={11} color="$secondary5" minWidth={60}>
                       [{segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s]
                     </Text>
-                    <Text fontSize={13} color="$secondary9" flex={1}>
+                    <Text fontSize={fontSizes.segment} color="$secondary9" flex={1}>
                       {segment.text}
                     </Text>
                   </XStack>

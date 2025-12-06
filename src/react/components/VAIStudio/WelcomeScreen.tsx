@@ -1,6 +1,7 @@
 import React from 'react'
 import { YStack, XStack, Text, H1 } from '@odd-design-system/ui-components'
 import { CheckCircleIcon } from './Icons'
+import { CustomThemeSwitch } from './CustomThemeSwitch'
 
 export interface WelcomeScreenProps {
   version?: string
@@ -17,7 +18,7 @@ function FeatureItem({ text }: FeatureItemProps) {
       <YStack marginTop={2}>
         <CheckCircleIcon size={20} color="hsl(180, 70%, 55%)" />
       </YStack>
-      <Text fontSize={16} color="$secondary9" lineHeight={24}>
+      <Text fontSize={16} color="$color" lineHeight={24}>
         {text}
       </Text>
     </XStack>
@@ -58,25 +59,30 @@ export function WelcomeScreen({
           right: 16,
         }}
       >
-        <XStack
-          backgroundColor="$secondary2"
-          paddingHorizontal={12}
-          paddingVertical={4}
-          borderRadius={999}
-        >
-          <Text
-            fontSize={12}
-            fontWeight="600"
-            color="$secondary9"
-            fontFamily="$heading"
+        <XStack gap={8} alignItems="center">
+          <CustomThemeSwitch />
+          <XStack
+            backgroundColor="$color3"
+            borderRadius={999}
+            width={56}
+            height={28}
+            justifyContent="center"
+            alignItems="center"
           >
-            {version}
-          </Text>
+            <Text
+              fontSize={12}
+              fontWeight="600"
+              color="$color"
+              fontFamily="$heading"
+            >
+              {version}
+            </Text>
+          </XStack>
         </XStack>
         <Text
-          fontSize={12}
-          color="$secondary6"
-          marginTop={8}
+          fontSize={10}
+          color="$color9"
+          marginTop={6}
         >
           {releaseDate}
         </Text>
@@ -99,7 +105,7 @@ export function WelcomeScreen({
           </H1>
           <Text
             fontSize={18}
-            color="$secondary9"
+            color="$color"
             textAlign="center"
             $sm={{
               fontSize: 16,

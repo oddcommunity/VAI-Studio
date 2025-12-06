@@ -5,9 +5,10 @@ import {
   Text,
   Button,
   H2,
+  Checkbox,
+  useTheme,
 } from '@odd-design-system/ui-components'
-import { Checkbox, Select, useTheme } from 'tamagui'
-import { Check, ChevronDown } from '@tamagui/lucide-icons'
+import { Check } from '@tamagui/lucide-icons'
 import {
   GraphicEqIcon,
   AudioFileIcon,
@@ -16,6 +17,7 @@ import {
   SettingsIcon,
   FolderIcon,
 } from './Icons'
+import { GroupedModelSelector, ModelGroup } from './GroupedModelSelector'
 
 export interface Model {
   id: string
@@ -24,8 +26,11 @@ export interface Model {
 
 export interface SidebarProps {
   models?: Model[]
+  modelGroups?: ModelGroup[]
   selectedModel?: string
   onModelChange?: (modelId: string) => void
+  selectedModels?: string[]
+  onModelsChange?: (models: string[]) => void
   onSelectFile?: () => void
   onRecordAudio?: () => void
   onAddMultipleFiles?: () => void
@@ -35,12 +40,17 @@ export interface SidebarProps {
   compareMode?: boolean
   onCompareModeChange?: (enabled: boolean) => void
   isTranscribing?: boolean
+  /** Currently selected audio file path */
+  selectedFile?: string
 }
 
 export function Sidebar({
   models = [],
+  modelGroups = [],
   selectedModel = '',
   onModelChange,
+  selectedModels = [],
+  onModelsChange,
   onSelectFile,
   onRecordAudio,
   onAddMultipleFiles,
@@ -50,9 +60,12 @@ export function Sidebar({
   compareMode = false,
   onCompareModeChange,
   isTranscribing = false,
+  selectedFile,
 }: SidebarProps) {
   const theme = useTheme()
   const [isMounted, setIsMounted] = useState(false)
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
+  const [isCompareSelectorOpen, setIsCompareSelectorOpen] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -71,29 +84,38 @@ export function Sidebar({
 
   return (
     <YStack
-      width="100%"
-      flexShrink={0}
-      backgroundColor="$secondary2"
-      borderBottomWidth={1}
-      borderBottomColor="$secondary3"
+      width={320}
+      minHeight="100vh"
+      backgroundColor="$color2"
+      borderRightWidth={1}
+      borderRightColor="$color4"
       padding={24}
       gap={32}
       $sm={{
-        width: 360,
-        borderBottomWidth: 0,
-        borderRightWidth: 1,
-        borderRightColor: '$secondary3',
+        width: '100%',
+        flex: 1,
+        minHeight: 'auto',
+        borderRightWidth: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: '$color4',
       }}
     >
       {/* Header */}
       <YStack gap={4}>
-        <XStack alignItems="center" gap={8}>
-          <GraphicEqIcon size={32} color={theme.primary8?.val} />
-          <H2>
+        <XStack alignItems="center" gap={12}>
+          <GraphicEqIcon size={28} color={theme.primary8?.val} />
+          <H2
+            margin={0}
+            padding={0}
+            lineHeight={28}
+            fontSize={24}
+            fontWeight="800"
+            fontFamily="$heading"
+          >
             VAI Studio
           </H2>
         </XStack>
-        <Text fontSize={15} color="$secondary9" lineHeight={22}>
+        <Text fontSize={15} color="$color" lineHeight={22}>
           Test and compare local speech-to-text models
         </Text>
       </YStack>
@@ -107,7 +129,7 @@ export function Sidebar({
               fontSize={11}
               fontWeight="600"
               textTransform="uppercase"
-              color="$secondary6"
+              color="$color9"
               letterSpacing={1}
               fontFamily="$heading"
             >
@@ -117,9 +139,9 @@ export function Sidebar({
               <XStack gap={8}>
                 <Button
                   flex={1}
-                  backgroundColor="$primary6"
-                  hoverStyle={{ backgroundColor: '$primary5' }}
-                  pressStyle={{ backgroundColor: '$primary4' }}
+                  backgroundColor="hsl(215, 83%, 50%)"
+                  hoverStyle={{ backgroundColor: 'hsl(215, 83%, 55%)' }}
+                  pressStyle={{ backgroundColor: 'hsl(215, 83%, 60%)' }}
                   paddingHorizontal={16}
                   paddingVertical={16}
                   borderRadius={8}
@@ -139,9 +161,9 @@ export function Sidebar({
                 </Button>
                 <Button
                   flex={1}
-                  backgroundColor="hsl(0, 84%, 60%)"
-                  hoverStyle={{ backgroundColor: 'hsl(0, 84%, 65%)' }}
-                  pressStyle={{ backgroundColor: 'hsl(0, 84%, 70%)' }}
+                  backgroundColor="hsl(0, 80%, 55%)"
+                  hoverStyle={{ backgroundColor: 'hsl(0, 80%, 60%)' }}
+                  pressStyle={{ backgroundColor: 'hsl(0, 80%, 65%)' }}
                   paddingHorizontal={16}
                   paddingVertical={16}
                   borderRadius={8}
@@ -165,108 +187,79 @@ export function Sidebar({
                 width="100%"
                 backgroundColor="transparent"
                 borderWidth={1}
-                borderColor="$secondary4"
-                hoverStyle={{ backgroundColor: '$secondary3' }}
-                pressStyle={{ backgroundColor: '$secondary4' }}
+                borderColor="$color4"
+                hoverStyle={{ backgroundColor: '$color3' }}
+                pressStyle={{ backgroundColor: '$color4' }}
                 paddingHorizontal={16}
                 paddingVertical={16}
                 borderRadius={8}
                 height={56}
                 onPress={onAddMultipleFiles}
-                icon={<PlusIcon size={20} color={theme.secondary9?.val} />}
+                icon={<PlusIcon size={20} color={theme.color10?.val} />}
                 aria-label="Add multiple files"
               >
                 <Text
                   fontSize={15}
                   fontWeight="600"
-                  color="$secondary9"
+                  color="$color"
                   fontFamily="$heading"
                 >
                   Add Multiple Files
                 </Text>
               </Button>
+              {/* Selected File Display */}
+              {selectedFile && (
+                <XStack
+                  backgroundColor="$color3"
+                  borderRadius={6}
+                  padding={12}
+                  alignItems="center"
+                  gap={8}
+                >
+                  <AudioFileIcon size={16} color={theme.primary8?.val} />
+                  <Text
+                    fontSize={13}
+                    color="$color"
+                    fontFamily="$heading"
+                    flex={1}
+                    numberOfLines={1}
+                  >
+                    {selectedFile.split('/').pop()?.split('\\').pop() || selectedFile}
+                  </Text>
+                </XStack>
+              )}
             </YStack>
           </YStack>
 
           {/* Model Section */}
-          <YStack gap={12}>
+          <YStack gap={12} position="relative" zIndex={10} minHeight={40}>
             <Text
               fontSize={11}
               fontWeight="600"
               textTransform="uppercase"
-              color="$secondary6"
+              color="$color9"
               letterSpacing={1}
               fontFamily="$heading"
             >
               Model
             </Text>
-            {isMounted ? (
-              <Select
-                value={selectedModel}
-                onValueChange={handleModelChange}
-              >
-                <Select.Trigger
-                  width="100%"
-                  backgroundColor="$secondary5"
-                  borderWidth={0}
-                  borderRadius={6}
-                  paddingHorizontal={16}
-                  paddingVertical={14}
-                  height={48}
-                  unstyled={false}
-                  iconAfter={
-                    <ChevronDown
-                      size={18}
-                      color={theme.secondary9?.val}
-                    />
-                  }
-                >
-                  <Select.Value
-                    placeholder="Select a model"
-                    color="$secondary9"
-                    fontSize={15}
-                    fontFamily="$heading"
-                  />
-                </Select.Trigger>
-                <Select.Content zIndex={200000}>
-                  <Select.ScrollUpButton />
-                  <Select.Viewport>
-                    <Select.Group>
-                      {models.length === 0 ? (
-                        <Select.Item value="none" index={0}>
-                          <Select.ItemText>No models available</Select.ItemText>
-                        </Select.Item>
-                      ) : (
-                        models.map((model, index) => (
-                          <Select.Item key={model.id} value={model.id} index={index}>
-                            <Select.ItemText>{model.name}</Select.ItemText>
-                            <Select.ItemIndicator>
-                              <Check size={16} />
-                            </Select.ItemIndicator>
-                          </Select.Item>
-                        ))
-                      )}
-                    </Select.Group>
-                  </Select.Viewport>
-                  <Select.ScrollDownButton />
-                </Select.Content>
-              </Select>
+            {compareMode ? (
+              <GroupedModelSelector
+                groups={modelGroups}
+                multiSelect={true}
+                selectedModels={selectedModels}
+                onModelsChange={onModelsChange}
+                isOpen={isCompareSelectorOpen}
+                onOpenChange={setIsCompareSelectorOpen}
+              />
             ) : (
-              <XStack
-                width="100%"
-                backgroundColor="$secondary5"
-                borderRadius={6}
-                paddingHorizontal={16}
-                paddingVertical={14}
-                height={48}
-                alignItems="center"
-                justifyContent="space-between"
-              >
-                <Text color="$secondary9" fontSize={15} fontFamily="$heading">
-                  Select a model
-                </Text>
-                <ChevronDown size={18} color={theme.secondary9?.val} />
-              </XStack>
+              <GroupedModelSelector
+                groups={modelGroups}
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                isOpen={isModelSelectorOpen}
+                onOpenChange={setIsModelSelectorOpen}
+              />
             )}
           </YStack>
 
@@ -276,7 +269,7 @@ export function Sidebar({
               fontSize={11}
               fontWeight="600"
               textTransform="uppercase"
-              color="$secondary6"
+              color="$color9"
               letterSpacing={1}
               fontFamily="$heading"
             >
@@ -288,19 +281,17 @@ export function Sidebar({
               padding={8}
               marginHorizontal={-8}
               borderRadius={6}
-              hoverStyle={{ backgroundColor: '$secondary3' }}
-              pressStyle={{ backgroundColor: '$secondary3' }}
+              hoverStyle={{ backgroundColor: '$color3' }}
+              pressStyle={{ backgroundColor: '$color3' }}
               onPress={handleCompareModeToggle}
               cursor="pointer"
             >
               <Checkbox
                 checked={compareMode}
-                onCheckedChange={(checked) =>
-                  onCompareModeChange?.(checked === true)
-                }
+                pointerEvents="none"
                 backgroundColor={compareMode ? '$primary6' : 'transparent'}
                 borderWidth={2}
-                borderColor={compareMode ? '$primary6' : '$secondary6'}
+                borderColor={compareMode ? '$primary6' : '$color6'}
                 borderRadius={999}
                 width={22}
                 height={22}
@@ -312,7 +303,7 @@ export function Sidebar({
               <Text
                 fontSize={15}
                 fontWeight="500"
-                color="$secondary11"
+                color="$color"
                 fontFamily="$heading"
               >
                 Compare multiple models
@@ -324,9 +315,9 @@ export function Sidebar({
         {/* Transcribe Button */}
         <Button
           width="100%"
-          backgroundColor="hsl(28, 100%, 58%)"
-          hoverStyle={{ backgroundColor: 'hsl(28, 100%, 62%)' }}
-          pressStyle={{ backgroundColor: 'hsl(28, 100%, 66%)' }}
+          backgroundColor="hsl(30, 90%, 55%)"
+          hoverStyle={{ backgroundColor: 'hsl(30, 90%, 60%)' }}
+          pressStyle={{ backgroundColor: 'hsl(30, 90%, 65%)' }}
           paddingHorizontal={16}
           paddingVertical={18}
           borderRadius={8}
@@ -356,16 +347,16 @@ export function Sidebar({
           paddingHorizontal={12}
           paddingVertical={12}
           borderRadius={6}
-          hoverStyle={{ backgroundColor: '$secondary3' }}
-          pressStyle={{ backgroundColor: '$secondary3' }}
+          hoverStyle={{ backgroundColor: '$color3' }}
+          pressStyle={{ backgroundColor: '$color3' }}
           onPress={onAdvancedSettings}
-          icon={<SettingsIcon size={18} color={theme.secondary9?.val} />}
+          icon={<SettingsIcon size={18} color={theme.color10?.val} />}
           aria-label="Advanced settings"
         >
           <Text
             fontSize={15}
             fontWeight="500"
-            color="$secondary9"
+            color="$color"
             fontFamily="$heading"
           >
             Advanced Settings
@@ -378,16 +369,16 @@ export function Sidebar({
           paddingHorizontal={12}
           paddingVertical={12}
           borderRadius={6}
-          hoverStyle={{ backgroundColor: '$secondary3' }}
-          pressStyle={{ backgroundColor: '$secondary3' }}
+          hoverStyle={{ backgroundColor: '$color3' }}
+          pressStyle={{ backgroundColor: '$color3' }}
           onPress={onManageModels}
-          icon={<FolderIcon size={18} color={theme.secondary9?.val} />}
+          icon={<FolderIcon size={18} color={theme.color10?.val} />}
           aria-label="Manage models"
         >
           <Text
             fontSize={15}
             fontWeight="500"
-            color="$secondary9"
+            color="$color"
             fontFamily="$heading"
           >
             Manage Models

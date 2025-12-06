@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter, systemPreferences, session } = require('electron');
 const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const ElectronStore = require('electron-store');
+const PDFDocument = require('pdfkit');
 
 // Initialize Odd-Core services
 const { getLogger } = require('./odd-core-integration');
@@ -46,6 +47,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true, // Enable sandbox for security (renderer process isolation)
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   });
 
@@ -54,21 +58,21 @@ function createWindow() {
     // Production: load from dist-react
     mainWindow.loadFile(path.join(__dirname, '../dist-react/index.html'));
   } else {
-    // Development: load from Vite dev server or built files
-    // First try Vite dev server, fallback to built files
+    // Development: ALWAYS try Vite dev server first for hot reload
+    // This ensures code changes are immediately visible without rebuilding
     const devServerUrl = 'http://localhost:3000';
     const distHtmlPath = path.join(__dirname, '../dist-react/index.html');
 
-    if (fs.existsSync(distHtmlPath)) {
-      // Load from built files
-      mainWindow.loadFile(distHtmlPath);
-    } else {
-      // Try dev server (when running npm run dev:react)
-      mainWindow.loadURL(devServerUrl).catch(() => {
-        // Fallback to vanilla JS if React not built yet
+    mainWindow.loadURL(devServerUrl).catch(() => {
+      // Fallback to built files if dev server not running
+      if (fs.existsSync(distHtmlPath)) {
+        console.log('[Dev] Vite dev server not available, loading from dist-react');
+        mainWindow.loadFile(distHtmlPath);
+      } else {
+        // Fallback to vanilla JS if nothing else available
         mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
-      });
-    }
+      }
+    });
   }
 
   // Open DevTools only in development (--dev flag or when not packaged)
@@ -134,6 +138,44 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+
+  // Set up permission handler for media access (microphone, camera)
+  // IMPORTANT: Grant permission in renderer, but let macOS handle the system-level permission
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'microphone', 'audioCapture'];
+    if (allowedPermissions.includes(permission)) {
+      logger.info(`Permission requested: ${permission} - granting to renderer`);
+      callback(true);
+    } else {
+      logger.info(`Permission requested: ${permission} - denying`);
+      callback(false);
+    }
+  });
+
+  // CRITICAL FIX: Set up permission check handler
+  // This triggers BEFORE getUserMedia is called, allowing us to request macOS permission
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    const allowedPermissions = ['media', 'microphone', 'audioCapture'];
+    if (allowedPermissions.includes(permission)) {
+      logger.info(`Permission check: ${permission} - allowed`);
+      return true;
+    }
+    return false;
+  });
+
+  // On macOS, check microphone access status (don't request yet - wait for getUserMedia)
+  if (process.platform === 'darwin') {
+    const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+    logger.info('Initial microphone access status', { status: micStatus });
+
+    if (micStatus === 'not-determined') {
+      logger.info('Microphone permission not yet requested - will prompt on first use');
+    } else if (micStatus === 'denied') {
+      logger.warn('Microphone access previously denied - user must enable in System Preferences');
+    } else if (micStatus === 'granted') {
+      logger.info('Microphone access already granted');
+    }
+  }
 
   // Check for updates after 3 seconds (give app time to settle)
   setTimeout(() => {
@@ -255,26 +297,45 @@ function runPythonCommand(args) {
 // ========================================
 
 /**
- * Get the path to the bundled FFmpeg binary
+ * Get the path to FFmpeg binary
+ * Tries ffmpeg-static first, then falls back to system ffmpeg
  */
 function getFfmpegPath() {
-  // ffmpeg-static provides the path to the binary
-  // In packaged app, we need to account for asar unpacking
+  // First try ffmpeg-static (for packaged app)
   try {
     const ffmpegStatic = require('ffmpeg-static');
     let ffmpegPath = ffmpegStatic;
 
     // In packaged app, the path needs to be adjusted for asar unpacking
-    if (app.isPackaged && ffmpegPath.includes('app.asar')) {
+    if (app.isPackaged && ffmpegPath && ffmpegPath.includes('app.asar')) {
       ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
     }
 
-    logger.info('FFmpeg path resolved', { ffmpegPath });
-    return ffmpegPath;
+    // Check if the binary actually exists
+    if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+      logger.info('FFmpeg path resolved (ffmpeg-static)', { ffmpegPath });
+      return ffmpegPath;
+    }
   } catch (e) {
-    logger.error('Failed to get ffmpeg-static path', { error: e.message });
-    return null;
+    logger.warn('ffmpeg-static not available', { error: e.message });
   }
+
+  // Fallback to system ffmpeg
+  const systemPaths = [
+    '/opt/homebrew/bin/ffmpeg',  // macOS Apple Silicon (Homebrew)
+    '/usr/local/bin/ffmpeg',      // macOS Intel (Homebrew)
+    '/usr/bin/ffmpeg',            // Linux system
+  ];
+
+  for (const systemPath of systemPaths) {
+    if (fs.existsSync(systemPath)) {
+      logger.info('FFmpeg path resolved (system)', { ffmpegPath: systemPath });
+      return systemPath;
+    }
+  }
+
+  logger.error('FFmpeg not found in any location');
+  return null;
 }
 
 /**
@@ -463,10 +524,14 @@ ipcMain.handle('benchmark', async (event, { audioPath, backend, modelName, refer
 // Open file dialog
 ipcMain.handle('select-audio-file', async () => {
   try {
+    // Default to recordings folder
+    const recordingsDir = getRecordingsFolder();
+
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
+      defaultPath: recordingsDir,
       filters: [
-        { name: 'Audio Files', extensions: ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'wma'] },
+        { name: 'Audio Files', extensions: ['webm', 'mp3', 'wav', 'm4a', 'flac', 'ogg', 'wma'] },
         { name: 'All Files', extensions: ['*'] }
       ]
     });
@@ -500,6 +565,26 @@ ipcMain.handle('select-multiple-audio-files', async () => {
     return { success: true, filePaths: result.filePaths };
   } catch (error) {
     console.error('Error selecting files:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Select directory dialog
+ipcMain.handle('select-directory', async (event, { defaultPath, title }) => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: defaultPath || app.getPath('documents'),
+      title: title || 'Select Directory'
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    return { success: true, directoryPath: result.filePaths[0] };
+  } catch (error) {
+    console.error('Error selecting directory:', error);
     return { success: false, error: error.message };
   }
 });
@@ -564,6 +649,82 @@ ipcMain.handle('export-result', async (event, { result, format, filePath }) => {
           content += `1\n00:00:00.000 --> 00:00:05.000\n${result.text || ''}\n`;
         }
         break;
+
+      case 'pdf':
+        // Generate PDF document
+        return new Promise((resolve) => {
+          try {
+            const doc = new PDFDocument({
+              size: 'A4',
+              margins: { top: 50, bottom: 50, left: 50, right: 50 }
+            });
+            const writeStream = fs.createWriteStream(filePath);
+            doc.pipe(writeStream);
+
+            // Title
+            doc.fontSize(20).font('Helvetica-Bold').text('Transcription', { align: 'center' });
+            doc.moveDown();
+
+            // Metadata
+            doc.fontSize(10).font('Helvetica').fillColor('#666666');
+            if (result.language) {
+              doc.text(`Language: ${result.language}`);
+            }
+            if (result.processing_time) {
+              doc.text(`Processing Time: ${result.processing_time.toFixed(2)}s`);
+            }
+            if (result.device) {
+              doc.text(`Device: ${result.device}`);
+            }
+            doc.moveDown();
+
+            // Horizontal line
+            doc.strokeColor('#cccccc').lineWidth(1)
+              .moveTo(50, doc.y)
+              .lineTo(545, doc.y)
+              .stroke();
+            doc.moveDown();
+
+            // Transcription text
+            doc.fontSize(12).font('Helvetica').fillColor('#000000');
+            doc.text(result.text || 'No transcription text available', {
+              align: 'left',
+              lineGap: 4
+            });
+
+            // If segments exist, add them
+            if (result.segments && result.segments.length > 0) {
+              doc.moveDown(2);
+              doc.fontSize(14).font('Helvetica-Bold').text('Segments', { align: 'left' });
+              doc.moveDown();
+
+              doc.fontSize(10).font('Helvetica');
+              result.segments.forEach((seg) => {
+                const timestamp = `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s]`;
+                doc.fillColor('#888888').text(timestamp, { continued: true });
+                doc.fillColor('#000000').text(` ${seg.text.trim()}`);
+                doc.moveDown(0.5);
+              });
+            }
+
+            // Footer
+            doc.moveDown(2);
+            doc.fontSize(8).fillColor('#999999')
+              .text(`Generated by VAI Studio on ${new Date().toLocaleString()}`, { align: 'center' });
+
+            doc.end();
+
+            writeStream.on('finish', () => {
+              resolve({ success: true, filePath });
+            });
+
+            writeStream.on('error', (err) => {
+              resolve({ success: false, error: err.message });
+            });
+          } catch (err) {
+            resolve({ success: false, error: err.message });
+          }
+        });
 
       default:
         return { success: false, error: 'Unknown export format' };
@@ -872,6 +1033,50 @@ ipcMain.handle('restart-to-update', () => {
 // VOICE RECORDING IPC HANDLERS
 // ========================================
 
+// Request microphone permission (macOS only)
+ipcMain.handle('request-microphone-permission', async () => {
+  try {
+    if (process.platform !== 'darwin') {
+      // Only macOS requires explicit permission request
+      return { success: true, granted: true };
+    }
+
+    // Check current status first
+    const currentStatus = systemPreferences.getMediaAccessStatus('microphone');
+    logger.info('Microphone permission check', { currentStatus });
+
+    if (currentStatus === 'granted') {
+      return { success: true, granted: true };
+    }
+
+    if (currentStatus === 'denied') {
+      return {
+        success: true,
+        granted: false,
+        needsSystemPreferences: true,
+        message: 'Microphone access was denied. Please enable it in System Preferences > Privacy & Security > Microphone'
+      };
+    }
+
+    // Request permission (this will show the macOS dialog)
+    logger.info('Requesting microphone access from user');
+    const granted = await systemPreferences.askForMediaAccess('microphone');
+    logger.info('Microphone access result', { granted });
+
+    return {
+      success: true,
+      granted,
+      message: granted ? 'Microphone access granted' : 'Microphone access denied'
+    };
+  } catch (error) {
+    logger.error('Failed to request microphone permission', { error: error.message });
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
 // Get or create the recordings folder
 function getRecordingsFolder() {
   const os = require('os');
@@ -890,11 +1095,14 @@ function getRecordingsFolder() {
 // Save recorded audio blob to file
 ipcMain.handle('save-recording', async (event, { blob, mimeType, duration }) => {
   try {
-    const crypto = require('crypto');
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomId = crypto.randomBytes(4).toString('hex');
+    // Generate human-readable filename: vai-recording-YYYY-MM-DD-HH-MM
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}-${hours}-${minutes}`;
 
     // Determine file extension from MIME type
     let extension = 'webm'; // Default
@@ -905,7 +1113,7 @@ ipcMain.handle('save-recording', async (event, { blob, mimeType, duration }) => 
 
     // Create file path in dedicated recordings folder
     const recordingsDir = getRecordingsFolder();
-    const fileName = `vai-recording-${timestamp}-${randomId}.${extension}`;
+    const fileName = `vai-recording-${dateStr}.${extension}`;
     const filePath = path.join(recordingsDir, fileName);
 
     // Convert blob data (received as array buffer) to Buffer

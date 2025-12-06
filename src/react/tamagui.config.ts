@@ -3,7 +3,7 @@
  * Using VAI theme with dark mode optimized for Electron
  */
 
-import { createTamagui } from 'tamagui'
+import { createTamagui } from '@odd-design-system/ui-components'
 import { shorthands } from '@tamagui/shorthands'
 import { themes, tokens } from '@tamagui/themes'
 import { createMedia } from '@tamagui/react-native-media-driver'

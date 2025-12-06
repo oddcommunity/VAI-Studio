@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { YStack, XStack, Text, Button, styled } from 'tamagui'
+import { YStack, XStack, Text, Button, styled } from '@odd-design-system/ui-components'
 import { Mic, Square, Trash2, Check } from '@tamagui/lucide-icons'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
+import { useAppStore } from '../stores/useAppStore'
 import { Z_INDEX } from '../constants/zIndex'
 
 const RecordingOverlay = styled(YStack, {
@@ -67,11 +68,13 @@ interface RecordingControlsProps {
   onStopRecording: () => void
   onUseRecording: () => void
   onDiscardRecording: () => void
+  onClose?: () => void
   recordedAudio?: {
     duration: number
     fileName?: string
   } | null
   visible: boolean
+  error?: string | null
 }
 
 function formatDuration(seconds: number): string {
@@ -112,8 +115,10 @@ export function RecordingControls({
   onStopRecording,
   onUseRecording,
   onDiscardRecording,
+  onClose,
   recordedAudio,
   visible,
+  error,
 }: RecordingControlsProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
 
@@ -238,6 +243,36 @@ export function RecordingControls({
             Saved as: {recordedAudio.fileName}
           </Text>
         )}
+
+        {/* Error display for debugging */}
+        {error && (
+          <YStack
+            backgroundColor="hsla(0, 84%, 60%, 0.15)"
+            borderRadius={8}
+            padding={12}
+            marginTop={8}
+            borderWidth={1}
+            borderColor="hsl(0, 84%, 60%)"
+            maxWidth="100%"
+          >
+            <Text fontSize={13} fontWeight="600" color="hsl(0, 84%, 60%)" marginBottom={4}>
+              Recording Error:
+            </Text>
+            <Text fontSize={12} color="$secondary11" wordWrap="break-word">
+              {error}
+            </Text>
+            {onClose && (
+              <Button
+                size="$3"
+                backgroundColor="$secondary3"
+                marginTop={8}
+                onPress={onClose}
+              >
+                <Text fontSize={13} color="$secondary11">Close</Text>
+              </Button>
+            )}
+          </YStack>
+        )}
       </RecordingCard>
     </RecordingOverlay>
   )
@@ -246,6 +281,8 @@ export function RecordingControls({
 // Hook-connected version for easier use
 export function RecordingOverlayConnected() {
   const [showOverlay, setShowOverlay] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
+  const [debugError, setDebugError] = useState<string | null>(null)
 
   // Use the audio recorder hook for actual recording functionality
   const {
@@ -257,13 +294,42 @@ export function RecordingOverlayConnected() {
     useRecording,
   } = useAudioRecorder()
 
+  // Get trigger state from store
+  const { triggerRecording, setTriggerRecording } = useAppStore((state) => ({
+    triggerRecording: state.triggerRecording,
+    setTriggerRecording: state.setTriggerRecording,
+  }))
+
   const handleStartRecording = useCallback(async () => {
-    setShowOverlay(true)
-    await startRecording()
+    console.log('[RecordingOverlay] Starting recording process...')
+    setDebugError(null)     // Clear any previous error
+    setShowOverlay(true)    // Show overlay immediately for feedback
+    setIsStarting(true)     // Set starting state to show "Recording..." UI immediately
+
+    const result = await startRecording()  // Start recording (returns {success, error?})
+    console.log('[RecordingOverlay] Recording process completed:', result)
+
+    // Only clear isStarting if recording actually started (isRecording will be true)
+    if (result.success) {
+      setIsStarting(false)  // isRecording takes over
+    } else {
+      // Recording failed - show error in overlay instead of closing
+      setIsStarting(false)
+      setDebugError(result.error || 'Unknown error')
+      // Don't close overlay - let user see the error
+    }
   }, [startRecording])
 
   const handleStopRecording = useCallback(async () => {
-    await stopRecording()
+    const filePath = await stopRecording()
+    // Automatically set the file and close overlay
+    if (filePath) {
+      // Set the selected file directly using the store
+      const { setSelectedFile } = useAppStore.getState()
+      setSelectedFile(filePath)
+      console.log('[RecordingOverlay] Recording loaded for transcription:', filePath)
+    }
+    setShowOverlay(false)
   }, [stopRecording])
 
   const handleUseRecording = useCallback(() => {
@@ -276,15 +342,33 @@ export function RecordingOverlayConnected() {
     setShowOverlay(false)
   }, [discardRecording])
 
+  // Listen for external recording trigger from store
+  useEffect(() => {
+    if (triggerRecording) {
+      console.log('[RecordingOverlay] Trigger received, calling handleStartRecording...')
+      // Clear the trigger immediately
+      setTriggerRecording(false)
+      // Call the handler which shows overlay and starts recording
+      handleStartRecording()
+    }
+  }, [triggerRecording, setTriggerRecording, handleStartRecording])
+
+  const handleClose = useCallback(() => {
+    setShowOverlay(false)
+    setDebugError(null)
+  }, [])
+
   return (
     <RecordingControls
-      isRecording={isRecording}
+      isRecording={isRecording || isStarting}
       onStartRecording={handleStartRecording}
       onStopRecording={handleStopRecording}
       onUseRecording={handleUseRecording}
       onDiscardRecording={handleDiscardRecording}
+      onClose={handleClose}
       recordedAudio={recordedAudio}
-      visible={showOverlay || isRecording}
+      visible={showOverlay || isRecording || isStarting || !!debugError}
+      error={debugError}
     />
   )
 }

@@ -15,6 +15,8 @@ const defaultSettings: UserSettings = {
   enableWordTimestamps: false,
   modelCachePath: '',
   exportPath: '',
+  recordingsPath: '',
+  pdfExportPath: '',
   autoScroll: true,
   showNotifications: true,
   fontSize: 'medium'

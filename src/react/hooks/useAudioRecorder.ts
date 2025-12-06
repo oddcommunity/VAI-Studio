@@ -23,32 +23,43 @@ export function useAudioRecorder() {
 
   const isSupported = audioService.isRecordingSupported()
 
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    console.log('[useAudioRecorder] startRecording called, isSupported:', isSupported)
+
     if (!isSupported) {
+      const errorMsg = `Recording not supported: navigator=${typeof navigator}, mediaDevices=${typeof navigator?.mediaDevices}, MediaRecorder=${typeof MediaRecorder}`
+      console.error('[useAudioRecorder]', errorMsg)
       showToast('Audio recording is not supported in this browser', 'error')
-      return
+      return { success: false, error: errorMsg }
     }
 
     try {
+      console.log('[useAudioRecorder] Initializing audio service...')
       setRecordingTime(0)
       await audioService.startRecording((seconds) => {
         setRecordingTime(seconds)
       })
 
+      console.log('[useAudioRecorder] Audio service started, setting isRecording=true')
       setIsRecording(true)
       showToast('Recording started', 'info')
+      return { success: true }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start recording'
+      console.error('[useAudioRecorder] Start recording failed:', err)
       showToast(message, 'error')
+      return { success: false, error: message }
     }
   }, [isSupported, setIsRecording, showToast])
 
-  const stopRecording = useCallback(async () => {
+  const stopRecording = useCallback(async (): Promise<string | null> => {
     try {
       const { blob, mimeType, duration } = await audioService.stopRecording()
+      console.log('[useAudioRecorder] Recording stopped', { mimeType, duration })
 
       // Save recording to disk
       const saveResult = await audioService.saveRecording(blob, mimeType, duration)
+      console.log('[useAudioRecorder] Save result:', saveResult)
 
       if (saveResult.success && saveResult.filePath && saveResult.fileName) {
         setRecordedAudio({
@@ -60,7 +71,11 @@ export function useAudioRecorder() {
         })
 
         setIsRecording(false)
-        showToast('Recording stopped', 'success')
+        showToast(`Recording saved: ${saveResult.fileName}`, 'success')
+        console.log('[useAudioRecorder] Recording saved to:', saveResult.filePath)
+
+        // Return the file path so caller can use it immediately
+        return saveResult.filePath
       } else {
         throw new Error(saveResult.error || 'Failed to save recording')
       }
@@ -68,6 +83,8 @@ export function useAudioRecorder() {
       const message = err instanceof Error ? err.message : 'Failed to stop recording'
       showToast(message, 'error')
       setIsRecording(false)
+      console.error('[useAudioRecorder] Stop recording error:', err)
+      return null
     }
   }, [setIsRecording, setRecordedAudio, showToast])
 
@@ -114,6 +131,7 @@ export function useAudioRecorder() {
   }, [recordedAudio, showToast])
 
   const discardRecording = useCallback(() => {
+    console.log('[useAudioRecorder] Discarding recording')
     setRecordedAudio(null)
     setRecordingTime(0)
     showToast('Recording discarded', 'info')
@@ -122,9 +140,11 @@ export function useAudioRecorder() {
   const useRecording = useCallback(() => {
     if (!recordedAudio || !recordedAudio.filePath) {
       showToast('No recording available', 'error')
+      console.error('[useAudioRecorder] No recording to use')
       return
     }
 
+    console.log('[useAudioRecorder] Using recording:', recordedAudio.filePath)
     setSelectedFile(recordedAudio.filePath)
     showToast('Recording ready for transcription', 'success')
   }, [recordedAudio, setSelectedFile, showToast])

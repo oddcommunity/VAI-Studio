@@ -21,7 +21,7 @@ mistral-common>=1.0.0
 # Uses transformers (already included)
 
 # Granite backend
-# Uses transformers (already included)
+peft>=0.17.0  # Required for Granite Speech LoRA adapters
 
 # Wav2Vec BERT backend
 # Uses transformers (already included)

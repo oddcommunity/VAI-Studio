@@ -30,6 +30,7 @@ interface AppState {
 
   // Recording
   isRecording: boolean
+  triggerRecording: boolean
   recordedAudio: RecordedAudio | null
   currentAudioPlayer: HTMLAudioElement | null
 
@@ -55,6 +56,7 @@ interface AppState {
   updateBatchFileStatus: (index: number, status: BatchFile['status'], result?: TranscribeResult) => void
   setComparisonMode: (enabled: boolean) => void
   setIsRecording: (recording: boolean) => void
+  setTriggerRecording: (trigger: boolean) => void
   setRecordedAudio: (audio: RecordedAudio | null) => void
   setCurrentAudioPlayer: (player: HTMLAudioElement | null) => void
   setProgress: (progress: number, message: string, stage?: 'downloading' | 'loading' | 'transcribing') => void
@@ -78,6 +80,7 @@ export const useAppStore = create<AppState>((set) => ({
   isTranscribing: false,
   transcriptionResults: [],
   isRecording: false,
+  triggerRecording: false,
   recordedAudio: null,
   currentAudioPlayer: null,
   progress: 0,
@@ -134,6 +137,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   setIsRecording: (recording) => set({ isRecording: recording }),
 
+  setTriggerRecording: (trigger) => set({ triggerRecording: trigger }),
+
   setRecordedAudio: (audio) => set({ recordedAudio: audio }),
 
   setCurrentAudioPlayer: (player) => set({ currentAudioPlayer: player }),
@@ -165,6 +170,7 @@ export const useAppStore = create<AppState>((set) => ({
       isTranscribing: false,
       transcriptionResults: [],
       isRecording: false,
+      triggerRecording: false,
       recordedAudio: null,
       currentAudioPlayer: null,
       progress: 0,

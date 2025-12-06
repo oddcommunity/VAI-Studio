@@ -1,16 +1,22 @@
 import React, { ReactNode } from 'react'
-import { XStack, YStack } from '@odd-design-system/ui-components'
-import { ScrollView } from 'tamagui'
+import { XStack, YStack, ScrollView } from '@odd-design-system/ui-components'
 import { Sidebar, SidebarProps, Model } from './Sidebar'
 import { WelcomeScreen, WelcomeScreenProps } from './WelcomeScreen'
+import type { ModelGroup } from './GroupedModelSelector'
 
 export interface VAIStudioProps {
   /** Available models for selection */
   models?: Model[]
+  /** Grouped models for selection */
+  modelGroups?: ModelGroup[]
   /** Currently selected model ID */
   selectedModel?: string
   /** Callback when model selection changes */
   onModelChange?: (modelId: string) => void
+  /** Currently selected models for comparison */
+  selectedModels?: string[]
+  /** Callback when multi-model selection changes */
+  onModelsChange?: (models: string[]) => void
   /** Callback when "Select File" is pressed */
   onSelectFile?: () => void
   /** Callback when "Record Audio" is pressed */
@@ -35,12 +41,17 @@ export interface VAIStudioProps {
   releaseDate?: string
   /** Custom content to render instead of WelcomeScreen */
   children?: ReactNode
+  /** Currently selected audio file path */
+  selectedFile?: string
 }
 
 export function VAIStudio({
   models = [],
+  modelGroups = [],
   selectedModel = '',
   onModelChange,
+  selectedModels = [],
+  onModelsChange,
   onSelectFile,
   onRecordAudio,
   onAddMultipleFiles,
@@ -53,6 +64,7 @@ export function VAIStudio({
   version = 'v3.0.1',
   releaseDate = 'Nov 26, 2025',
   children,
+  selectedFile,
 }: VAIStudioProps) {
   return (
     <XStack
@@ -65,38 +77,24 @@ export function VAIStudio({
       }}
     >
       {/* Sidebar */}
-      <YStack
-        flexGrow={0}
-        flexShrink={0}
-        width={360}
-        maxHeight="100vh"
-        $sm={{
-          width: '100%',
-          maxHeight: 'auto',
-        }}
-      >
-        <ScrollView
-          flex={1}
-          contentContainerStyle={{
-            flexGrow: 1,
-          }}
-        >
-          <Sidebar
-            models={models}
-            selectedModel={selectedModel}
-            onModelChange={onModelChange}
-            onSelectFile={onSelectFile}
-            onRecordAudio={onRecordAudio}
-            onAddMultipleFiles={onAddMultipleFiles}
-            onTranscribe={onTranscribe}
-            onAdvancedSettings={onAdvancedSettings}
-            onManageModels={onManageModels}
-            compareMode={compareMode}
-            onCompareModeChange={onCompareModeChange}
-            isTranscribing={isTranscribing}
-          />
-        </ScrollView>
-      </YStack>
+      <Sidebar
+        models={models}
+        modelGroups={modelGroups}
+        selectedModel={selectedModel}
+        onModelChange={onModelChange}
+        selectedModels={selectedModels}
+        onModelsChange={onModelsChange}
+        onSelectFile={onSelectFile}
+        onRecordAudio={onRecordAudio}
+        onAddMultipleFiles={onAddMultipleFiles}
+        onTranscribe={onTranscribe}
+        onAdvancedSettings={onAdvancedSettings}
+        onManageModels={onManageModels}
+        compareMode={compareMode}
+        onCompareModeChange={onCompareModeChange}
+        isTranscribing={isTranscribing}
+        selectedFile={selectedFile}
+      />
 
       {/* Main Content Area */}
       <ScrollView
