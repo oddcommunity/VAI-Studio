@@ -13,10 +13,9 @@ if [[ "$SCRIPT_DIR" == *"/Contents/Resources/"* ]]; then
   export PYTHONHOME="$RESOURCES_DIR/backends/venv"
   PYTHON_BIN="$PYTHONHOME/bin/python"
 else
-  # Development: use backends-bundle
+  # Development: use backends-bundle venv directly (no PYTHONHOME needed)
   PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-  export PYTHONHOME="$PROJECT_ROOT/backends-bundle/venv"
-  PYTHON_BIN="$PYTHONHOME/bin/python"
+  PYTHON_BIN="$PROJECT_ROOT/backends-bundle/venv/bin/python"
 fi
 
 # Execute Python with all arguments passed to this script
