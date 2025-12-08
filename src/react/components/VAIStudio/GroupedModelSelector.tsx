@@ -172,7 +172,7 @@ export function GroupedModelSelector({
         <Text
           color="$color"
           fontSize="$3"
-          fontFamily="$heading"
+          fontFamily="$body"
           flex={1}
           numberOfLines={1}
         >
@@ -212,7 +212,7 @@ export function GroupedModelSelector({
         cursor="pointer"
         onPress={() => onOpenChange(false)}
       >
-        <Text color="$color" fontSize="$3" fontFamily="$heading">
+        <Text color="$color" fontSize="$3" fontFamily="$body">
           Select a model
         </Text>
         <ChevronDown size={18} color={theme.color10?.val} style={{ transform: [{ rotate: '180deg' }] }} />
@@ -229,17 +229,17 @@ export function GroupedModelSelector({
         <Search size={16} color={theme.color9?.val} />
         <Input
           flex={1}
-          backgroundColor="hsl(215, 60%, 45%)"
+          backgroundColor="#FFFFFF"
           borderWidth={0}
           borderRadius={6}
           paddingHorizontal={10}
           paddingVertical={6}
           height={32}
           placeholder="Search models..."
-          placeholderTextColor="rgba(255,255,255,0.6)"
-          color="#FFFFFF"
+          placeholderTextColor="$color9"
+          color="$color12"
           fontSize="$2"
-          fontFamily="$heading"
+          fontFamily="$body"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -275,24 +275,24 @@ export function GroupedModelSelector({
                   hoverStyle={{ backgroundColor: '$color4' }}
                   onPress={() => toggleGroup(group.backend)}
                 >
-                  <XStack alignItems="center" gap={4} flex={1} overflow="hidden">
+                  <XStack alignItems="center" gap={6} flex={1} overflow="hidden">
                     {isExpanded ? (
-                      <ChevronDown size={12} color={theme.color?.val} />
+                      <ChevronDown size={16} color={theme.color9?.val} />
                     ) : (
-                      <ChevronRight size={12} color={theme.color?.val} />
+                      <ChevronRight size={16} color={theme.color9?.val} />
                     )}
                     <Text
                       fontSize="$1"
                       fontWeight="600"
                       color="$color"
-                      fontFamily="$heading"
+                      fontFamily="$body"
                     >
                       {info.displayName}
                     </Text>
                     <Text
                       fontSize="$1"
                       color="$color9"
-                      fontFamily="$heading"
+                      fontFamily="$body"
                     >
                       ({info.provider})
                     </Text>
@@ -300,7 +300,7 @@ export function GroupedModelSelector({
                   <Text
                     fontSize="$1"
                     color="$color9"
-                    fontFamily="$heading"
+                    fontFamily="$body"
                     flexShrink={0}
                   >
                     {group.models.length} {group.models.length === 1 ? 'model' : 'models'}
@@ -337,7 +337,7 @@ export function GroupedModelSelector({
                             <Text
                               fontSize="$2"
                               color={isSelected ? '#FFFFFF' : '$color'}
-                              fontFamily="$heading"
+                              fontFamily="$body"
                               fontWeight={isSelected ? '600' : '400'}
                               $group-modelItem-hover={{ color: '#FFFFFF' }}
                             >
@@ -346,7 +346,7 @@ export function GroupedModelSelector({
                             <Text
                               fontSize="$1"
                               color={isSelected ? 'rgba(255,255,255,0.7)' : '$color9'}
-                              fontFamily="$heading"
+                              fontFamily="$body"
                               $group-modelItem-hover={{ color: 'rgba(255,255,255,0.7)' }}
                             >
                               {model.size}
@@ -393,7 +393,7 @@ export function GroupedModelSelector({
         borderTopWidth={1}
         borderTopColor="$color5"
       >
-        <Text fontSize="$1" color="$color9" fontFamily="$heading">
+        <Text fontSize="$1" color="$color9" fontFamily="$body">
           {totalModels} models
         </Text>
       </XStack>

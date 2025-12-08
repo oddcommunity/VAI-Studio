@@ -10,12 +10,12 @@ import {
 } from '@odd-design-system/ui-components'
 import { Check } from '@tamagui/lucide-icons'
 import {
-  GraphicEqIcon,
   AudioFileIcon,
   MicIcon,
   PlusIcon,
   SettingsIcon,
   FolderIcon,
+  CloseIcon,
 } from './Icons'
 import { GroupedModelSelector, ModelGroup } from './GroupedModelSelector'
 
@@ -42,6 +42,14 @@ export interface SidebarProps {
   isTranscribing?: boolean
   /** Currently selected audio file path */
   selectedFile?: string
+  /** Callback to clear the selected file */
+  onClearFile?: () => void
+  /** Batch files for multiple file selection */
+  batchFiles?: { path: string; name: string }[]
+  /** Callback to remove a batch file by index */
+  onRemoveBatchFile?: (index: number) => void
+  /** Callback to clear all batch files */
+  onClearBatchFiles?: () => void
 }
 
 export function Sidebar({
@@ -61,6 +69,10 @@ export function Sidebar({
   onCompareModeChange,
   isTranscribing = false,
   selectedFile,
+  onClearFile,
+  batchFiles = [],
+  onRemoveBatchFile,
+  onClearBatchFiles,
 }: SidebarProps) {
   const theme = useTheme()
   const [isMounted, setIsMounted] = useState(false)
@@ -103,7 +115,11 @@ export function Sidebar({
       {/* Header */}
       <YStack gap={4}>
         <XStack alignItems="center" gap={12}>
-          <GraphicEqIcon size={28} color={theme.primary8?.val} />
+          <img
+            src="./app-icon.png"
+            alt="VAI Studio"
+            style={{ width: 28, height: 28, borderRadius: 6, display: 'block' }}
+          />
           <H2
             margin={0}
             padding={0}
@@ -111,6 +127,8 @@ export function Sidebar({
             fontSize={24}
             fontWeight="800"
             fontFamily="$heading"
+            marginTop={5}
+            marginLeft={-2}
           >
             VAI Studio
           </H2>
@@ -207,8 +225,8 @@ export function Sidebar({
                   Add Multiple Files
                 </Text>
               </Button>
-              {/* Selected File Display */}
-              {selectedFile && (
+              {/* Selected File Display - Single file */}
+              {selectedFile && batchFiles.length === 0 && (
                 <XStack
                   backgroundColor="$color3"
                   borderRadius={6}
@@ -220,13 +238,74 @@ export function Sidebar({
                   <Text
                     fontSize={13}
                     color="$color"
-                    fontFamily="$heading"
+                    fontFamily="$body"
                     flex={1}
                     numberOfLines={1}
                   >
                     {selectedFile.split('/').pop()?.split('\\').pop() || selectedFile}
                   </Text>
+                  <XStack
+                    padding={4}
+                    borderRadius={4}
+                    cursor="pointer"
+                    hoverStyle={{ backgroundColor: '$color4' }}
+                    pressStyle={{ backgroundColor: '$color5' }}
+                    onPress={onClearFile}
+                  >
+                    <CloseIcon size={14} color={theme.color9?.val} />
+                  </XStack>
                 </XStack>
+              )}
+              {/* Batch Files Display - Multiple files */}
+              {batchFiles.length > 0 && (
+                <YStack gap={6}>
+                  <XStack alignItems="center" justifyContent="space-between">
+                    <Text fontSize={12} color="$color9" fontFamily="$body">
+                      {batchFiles.length} file{batchFiles.length > 1 ? 's' : ''} selected
+                    </Text>
+                    <Text
+                      fontSize={12}
+                      color="$primary8"
+                      fontFamily="$body"
+                      cursor="pointer"
+                      hoverStyle={{ opacity: 0.7 }}
+                      onPress={onClearBatchFiles}
+                    >
+                      Clear all
+                    </Text>
+                  </XStack>
+                  {batchFiles.map((file, index) => (
+                    <XStack
+                      key={file.path}
+                      backgroundColor="$color3"
+                      borderRadius={6}
+                      padding={10}
+                      alignItems="center"
+                      gap={8}
+                    >
+                      <AudioFileIcon size={14} color={theme.primary8?.val} />
+                      <Text
+                        fontSize={12}
+                        color="$color"
+                        fontFamily="$body"
+                        flex={1}
+                        numberOfLines={1}
+                      >
+                        {file.name}
+                      </Text>
+                      <XStack
+                        padding={4}
+                        borderRadius={4}
+                        cursor="pointer"
+                        hoverStyle={{ backgroundColor: '$color4' }}
+                        pressStyle={{ backgroundColor: '$color5' }}
+                        onPress={() => onRemoveBatchFile?.(index)}
+                      >
+                        <CloseIcon size={12} color={theme.color9?.val} />
+                      </XStack>
+                    </XStack>
+                  ))}
+                </YStack>
               )}
             </YStack>
           </YStack>

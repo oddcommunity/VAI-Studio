@@ -142,7 +142,7 @@ class ElectronBridge {
   }
 
   // Clipboard
-  copyToClipboard(text: string): boolean {
+  async copyToClipboard(text: string): Promise<boolean> {
     return this.ensureAPI().copyToClipboard(text)
   }
 }

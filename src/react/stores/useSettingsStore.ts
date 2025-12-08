@@ -39,7 +39,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       pdfExportPath: updates.pdfExportPath ?? current.pdfExportPath,
       autoScroll: updates.autoScroll ?? current.autoScroll,
       showNotifications: updates.showNotifications ?? current.showNotifications,
-      fontSize: updates.fontSize ?? current.fontSize
+      fontSize: updates.fontSize ?? current.fontSize,
+      hasCompletedOnboarding: updates.hasCompletedOnboarding ?? current.hasCompletedOnboarding
     }
 
     settingsService.saveSettings(newSettings)

@@ -285,6 +285,8 @@ export function VAIStudioFeatureScreen({
     } finally {
       setIsTranscribing(false)
       setProgress(0, '', undefined)
+      // Refresh backends to update model installed status (model may have been downloaded during transcription)
+      loadBackends()
     }
   }, [
     selectedFile,
@@ -299,6 +301,7 @@ export function VAIStudioFeatureScreen({
     updateBatchFileStatus,
     transcribeSingleFile,
     showToast,
+    loadBackends,
   ])
 
   // Clear comparison models when comparison mode is disabled
@@ -369,6 +372,10 @@ export function VAIStudioFeatureScreen({
       version="v3.0.1"
       releaseDate="Nov 26, 2025"
       selectedFile={selectedFile ?? undefined}
+      onClearFile={() => setSelectedFile(null)}
+      batchFiles={batchFiles}
+      onRemoveBatchFile={removeBatchFile}
+      onClearBatchFiles={clearBatchFiles}
     >
       {hasResults ? (
         <ResultsPanel

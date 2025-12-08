@@ -19,7 +19,8 @@ const defaultSettings: UserSettings = {
   pdfExportPath: '',
   autoScroll: true,
   showNotifications: true,
-  fontSize: 'medium'
+  fontSize: 'medium',
+  hasCompletedOnboarding: false
 }
 
 export class SettingsService {

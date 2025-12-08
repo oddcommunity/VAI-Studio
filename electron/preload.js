@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, clipboard } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -52,6 +52,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     signOut: () => ipcRenderer.invoke('auth:sign-out'),
     getSession: () => ipcRenderer.invoke('auth:get-session'),
     checkModelAccess: (modelName) => ipcRenderer.invoke('auth:check-model-access', modelName),
+    isAuthenticated: () => ipcRenderer.invoke('auth:is-authenticated'),
+    setSessionFromTokens: (accessToken, refreshToken) => ipcRenderer.invoke('auth:set-session-tokens', accessToken, refreshToken),
+    // Listen for auth success from deep link callback
+    onAuthSuccess: (callback) => {
+      const subscription = (event, data) => callback(data);
+      ipcRenderer.on('auth-success', subscription);
+      return () => {
+        ipcRenderer.removeListener('auth-success', subscription);
+      };
+    },
+    // Listen for auth error from deep link callback
+    onAuthError: (callback) => {
+      const subscription = (event, data) => callback(data);
+      ipcRenderer.on('auth-error', subscription);
+      return () => {
+        ipcRenderer.removeListener('auth-error', subscription);
+      };
+    },
   },
 
   // HuggingFace Authentication
@@ -86,11 +104,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
 
-  // Clipboard
-  copyToClipboard: (text) => {
-    clipboard.writeText(text);
-    return true;
-  },
+  // Clipboard (uses IPC for sandboxed renderer)
+  copyToClipboard: (text) => ipcRenderer.invoke('clipboard-write', text),
 });
 
 console.log('Preload script loaded');

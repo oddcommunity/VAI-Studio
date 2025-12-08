@@ -43,6 +43,14 @@ export interface VAIStudioProps {
   children?: ReactNode
   /** Currently selected audio file path */
   selectedFile?: string
+  /** Callback to clear the selected file */
+  onClearFile?: () => void
+  /** Batch files for multiple file selection */
+  batchFiles?: { path: string; name: string }[]
+  /** Callback to remove a batch file by index */
+  onRemoveBatchFile?: (index: number) => void
+  /** Callback to clear all batch files */
+  onClearBatchFiles?: () => void
 }
 
 export function VAIStudio({
@@ -65,6 +73,10 @@ export function VAIStudio({
   releaseDate = 'Nov 26, 2025',
   children,
   selectedFile,
+  onClearFile,
+  batchFiles = [],
+  onRemoveBatchFile,
+  onClearBatchFiles,
 }: VAIStudioProps) {
   return (
     <XStack
@@ -94,6 +106,10 @@ export function VAIStudio({
         onCompareModeChange={onCompareModeChange}
         isTranscribing={isTranscribing}
         selectedFile={selectedFile}
+        onClearFile={onClearFile}
+        batchFiles={batchFiles}
+        onRemoveBatchFile={onRemoveBatchFile}
+        onClearBatchFiles={onClearBatchFiles}
       />
 
       {/* Main Content Area */}

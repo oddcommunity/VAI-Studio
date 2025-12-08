@@ -1,20 +1,290 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter, systemPreferences, session } = require('electron');
+// Load environment variables from .env file
+require('dotenv').config();
+
+const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter, systemPreferences, session, clipboard } = require('electron');
 const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
 const ElectronStore = require('electron-store');
 const PDFDocument = require('pdfkit');
 
 // Initialize Odd-Core services
 const { getLogger } = require('./odd-core-integration');
-const { authService } = require('./auth-service');
+const { authService, AUTH_CALLBACK_PORT } = require('./auth-service');
 const logger = getLogger();
+
+// Auth callback server for magic link redirects
+let authCallbackServer = null;
+
+function startAuthCallbackServer() {
+  if (authCallbackServer) return; // Already running
+
+  authCallbackServer = http.createServer(async (req, res) => {
+    // Parse the URL - Supabase sends tokens in the hash fragment
+    // But since hash isn't sent to server, we need to serve a page that extracts it
+    const url = new URL(req.url, `http://localhost:${AUTH_CALLBACK_PORT}`);
+
+    if (url.pathname === '/auth-callback') {
+      // Serve a simple HTML page that extracts tokens from hash and sends to Electron
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>VAI Studio - Signing In...</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+              color: white;
+            }
+            .container {
+              text-align: center;
+              padding: 40px;
+            }
+            h1 { margin-bottom: 20px; }
+            .spinner {
+              width: 40px;
+              height: 40px;
+              border: 3px solid rgba(255,255,255,0.3);
+              border-top-color: #3b82f6;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+              margin: 20px auto;
+            }
+            @keyframes spin { to { transform: rotate(360deg); } }
+            .success { color: #22c55e; }
+            .error { color: #ef4444; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1 id="title">Signing you in...</h1>
+            <div class="spinner" id="spinner"></div>
+            <p id="message">Please wait while we complete your login.</p>
+          </div>
+          <script>
+            (async function() {
+              const hash = window.location.hash.substring(1);
+              if (!hash) {
+                document.getElementById('title').textContent = 'Error';
+                document.getElementById('title').className = 'error';
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('message').textContent = 'No authentication data received.';
+                return;
+              }
+
+              const params = new URLSearchParams(hash);
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+              const error = params.get('error');
+              const errorDesc = params.get('error_description');
+
+              if (error) {
+                document.getElementById('title').textContent = 'Login Failed';
+                document.getElementById('title').className = 'error';
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('message').textContent = errorDesc || error;
+                return;
+              }
+
+              if (accessToken) {
+                try {
+                  const response = await fetch('/complete-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessToken, refreshToken })
+                  });
+                  const result = await response.json();
+
+                  if (result.success) {
+                    document.getElementById('title').textContent = 'Success!';
+                    document.getElementById('title').className = 'success';
+                    document.getElementById('spinner').style.display = 'none';
+                    document.getElementById('message').textContent = 'You can close this window and return to VAI Studio.';
+                  } else {
+                    throw new Error(result.error || 'Authentication failed');
+                  }
+                } catch (e) {
+                  document.getElementById('title').textContent = 'Error';
+                  document.getElementById('title').className = 'error';
+                  document.getElementById('spinner').style.display = 'none';
+                  document.getElementById('message').textContent = e.message;
+                }
+              }
+            })();
+          </script>
+        </body>
+        </html>
+      `);
+    } else if (url.pathname === '/complete-auth' && req.method === 'POST') {
+      // Handle the token submission from the browser
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const { accessToken, refreshToken } = JSON.parse(body);
+          logger.info('Received auth tokens from browser callback');
+
+          const result = await authService.setSessionFromTokens(accessToken, refreshToken);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+
+          if (result.success && mainWindow) {
+            // Notify the renderer of successful auth
+            mainWindow.webContents.send('auth-success', {
+              email: result.session?.user?.email,
+              userId: result.session?.user?.id
+            });
+            // Focus the main window
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+          }
+        } catch (error) {
+          logger.error('Failed to complete auth', { error: error.message });
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: error.message }));
+        }
+      });
+    } else {
+      res.writeHead(404);
+      res.end('Not Found');
+    }
+  });
+
+  authCallbackServer.listen(AUTH_CALLBACK_PORT, () => {
+    logger.info(`Auth callback server listening on port ${AUTH_CALLBACK_PORT}`);
+  });
+
+  authCallbackServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.warn(`Auth callback port ${AUTH_CALLBACK_PORT} in use, trying next port`);
+      // Port in use, try next port
+      authCallbackServer = null;
+    } else {
+      logger.error('Auth callback server error', { error: err.message });
+    }
+  });
+}
+
+function stopAuthCallbackServer() {
+  if (authCallbackServer) {
+    authCallbackServer.close();
+    authCallbackServer = null;
+    logger.info('Auth callback server stopped');
+  }
+}
 
 const store = new ElectronStore.default();
 let mainWindow;
 let autoUpdater;
 let authWindow = null;
+
+// Deep link protocol for authentication
+const PROTOCOL_NAME = 'vai-studio';
+
+// Register custom protocol for deep linking (macOS/Windows)
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(PROTOCOL_NAME, process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(PROTOCOL_NAME);
+}
+
+// Handle deep link URL (macOS)
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  logger.info('Received deep link', { url });
+  handleAuthCallback(url);
+});
+
+// Handle deep link for Windows (single instance)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Windows: deep link URL is in commandLine
+    const url = commandLine.find(arg => arg.startsWith(`${PROTOCOL_NAME}://`));
+    if (url) {
+      logger.info('Received deep link (second instance)', { url });
+      handleAuthCallback(url);
+    }
+    // Focus the main window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
+/**
+ * Handle authentication callback from deep link
+ * URL format: vai-studio://auth-callback#access_token=...&refresh_token=...
+ */
+async function handleAuthCallback(url) {
+  try {
+    logger.info('Processing auth callback', { url: url.substring(0, 50) + '...' });
+
+    // Parse the URL - tokens can be in query params (from redirect page) or hash fragment (direct)
+    const urlObj = new URL(url);
+
+    // Try query params first (from HTTPS redirect page)
+    let accessToken = urlObj.searchParams.get('access_token');
+    let refreshToken = urlObj.searchParams.get('refresh_token');
+
+    // Fall back to hash fragment (from direct Supabase redirect)
+    if (!accessToken && urlObj.hash) {
+      const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+      accessToken = hashParams.get('access_token');
+      refreshToken = hashParams.get('refresh_token');
+    }
+
+    if (!accessToken) {
+      logger.error('No access token in callback URL');
+      if (mainWindow) {
+        mainWindow.webContents.send('auth-error', { error: 'No access token received' });
+      }
+      return;
+    }
+
+    logger.info('Tokens extracted from URL');
+
+    // Set the session using the tokens
+    const result = await authService.setSessionFromTokens(accessToken, refreshToken);
+
+    if (result.success) {
+      logger.info('Authentication successful', { email: result.session?.user?.email });
+
+      // Notify renderer of successful authentication
+      if (mainWindow) {
+        mainWindow.webContents.send('auth-success', {
+          email: result.session?.user?.email,
+          userId: result.session?.user?.id
+        });
+      }
+    } else {
+      logger.error('Failed to set session', { error: result.error });
+      if (mainWindow) {
+        mainWindow.webContents.send('auth-error', { error: result.error });
+      }
+    }
+  } catch (error) {
+    logger.error('Error handling auth callback', { error: error.message });
+    if (mainWindow) {
+      mainWindow.webContents.send('auth-error', { error: error.message });
+    }
+  }
+}
 
 // Initialize crash reporting
 crashReporter.start({
@@ -136,6 +406,9 @@ app.whenReady().then(() => {
   authService.initialize().catch(err => {
     logger.error('Failed to initialize auth service', { error: err.message });
   });
+
+  // Start auth callback server for magic link redirects
+  startAuthCallbackServer();
 
   createWindow();
 
@@ -425,6 +698,17 @@ function cleanupTempWav(tempPath) {
 
 // IPC Handlers
 
+// Clipboard write (needed for sandboxed renderer)
+ipcMain.handle('clipboard-write', async (event, text) => {
+  try {
+    clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    console.error('Clipboard write failed:', error);
+    return false;
+  }
+});
+
 // List all available backends
 ipcMain.handle('list-backends', async () => {
   try {
@@ -553,7 +837,7 @@ ipcMain.handle('select-multiple-audio-files', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Audio Files', extensions: ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'wma'] },
+        { name: 'Audio Files', extensions: ['webm', 'mp3', 'wav', 'm4a', 'flac', 'ogg', 'wma'] },
         { name: 'All Files', extensions: ['*'] }
       ]
     });
@@ -825,6 +1109,34 @@ ipcMain.handle('auth:check-model-access', async (event, modelName) => {
     return { success: true, hasAccess };
   } catch (error) {
     logger.error('Check model access failed', { modelName, error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Check if user has completed one-time authentication
+ipcMain.handle('auth:is-authenticated', async () => {
+  try {
+    const isAuthenticated = authService.isUserAuthenticated();
+    const email = authService.getStoredUserEmail();
+    return {
+      success: true,
+      isAuthenticated,
+      email
+    };
+  } catch (error) {
+    logger.error('Check authentication failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Set session from tokens (called from renderer when magic link redirects)
+ipcMain.handle('auth:set-session-tokens', async (event, accessToken, refreshToken) => {
+  try {
+    logger.info('Setting session from tokens (renderer request)');
+    const result = await authService.setSessionFromTokens(accessToken, refreshToken);
+    return result;
+  } catch (error) {
+    logger.error('Set session tokens failed', { error: error.message });
     return { success: false, error: error.message };
   }
 });

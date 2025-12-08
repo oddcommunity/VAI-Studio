@@ -57,6 +57,9 @@ export interface ElectronAPI {
     signOut(): Promise<{ success: boolean; error?: string }>;
     getSession(): Promise<{ success: boolean; session?: AuthSession | null; error?: string }>;
     checkModelAccess(modelName: string): Promise<{ success: boolean; hasAccess?: boolean; error?: string }>;
+    isAuthenticated(): Promise<{ success: boolean; isAuthenticated?: boolean; email?: string; error?: string }>;
+    onAuthSuccess(callback: (data: { email?: string; userId?: string }) => void): () => void;
+    onAuthError(callback: (data: { error?: string }) => void): () => void;
   };
 
   // App Updates
@@ -71,7 +74,7 @@ export interface ElectronAPI {
   openLicenseFile(): Promise<void>;
 
   // Clipboard
-  copyToClipboard(text: string): boolean;
+  copyToClipboard(text: string): Promise<boolean>;
 }
 
 // Extend Window interface
@@ -157,6 +160,7 @@ export interface UserSettings {
   autoScroll: boolean;
   showNotifications: boolean;
   fontSize: 'small' | 'medium' | 'large';
+  hasCompletedOnboarding: boolean;
 }
 
 // Progress Types

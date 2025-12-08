@@ -149,7 +149,7 @@ export function ResultCard({
     try {
       // Use Electron clipboard API if available, fallback to navigator.clipboard
       if (electronBridge.isElectron()) {
-        const success = electronBridge.copyToClipboard(result.text)
+        const success = await electronBridge.copyToClipboard(result.text)
         if (success) {
           setCopied(true)
           showToast('Copied to clipboard', 'success', 2000)

@@ -6,10 +6,87 @@ Uses OpenAI's Whisper model via the openai-whisper package.
 import time
 import os
 import sys
+import hashlib
 from typing import Dict, List
 import soundfile as sf
 from base import STTBackend, ModelInfo
 from progress import report_progress
+
+
+def download_with_progress(url: str, dest_path: str, model_name: str, fallback_url: str = None):
+    """
+    Download a file with live progress reporting.
+    This replaces whisper's internal download to give real-time progress.
+    Tries primary URL first, falls back to fallback_url if provided.
+    """
+    import urllib.request
+
+    # Create temp file in same directory for atomic rename
+    dest_dir = os.path.dirname(dest_path)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    temp_path = dest_path + '.downloading'
+    urls_to_try = [url]
+    if fallback_url:
+        urls_to_try.append(fallback_url)
+
+    last_error = None
+    for try_url in urls_to_try:
+        try:
+            print(f"[INFO] Trying download from: {try_url[:60]}...", file=sys.stderr)
+
+            # Get file size and start download
+            request = urllib.request.Request(try_url, headers={'User-Agent': 'VAI-Studio/3.0'})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                total_size = int(response.headers.get('content-length', 0))
+
+                # Download with progress
+                downloaded = 0
+                block_size = 64 * 1024  # 64KB blocks for smoother progress
+                last_progress = -1
+
+                with open(temp_path, 'wb') as f:
+                    while True:
+                        block = response.read(block_size)
+                        if not block:
+                            break
+                        f.write(block)
+                        downloaded += len(block)
+
+                        # Report progress (scale to 10-25% range for download phase)
+                        if total_size > 0:
+                            percent = (downloaded / total_size) * 100
+                            # Map 0-100% download to 10-25% overall progress
+                            overall_progress = 10 + (percent * 0.15)
+                            int_progress = int(overall_progress)
+
+                            # Only report when progress changes (reduce spam)
+                            if int_progress != last_progress:
+                                last_progress = int_progress
+                                mb_downloaded = downloaded / (1024 * 1024)
+                                mb_total = total_size / (1024 * 1024)
+                                report_progress(
+                                    overall_progress,
+                                    f'Downloading {model_name}: {mb_downloaded:.1f}/{mb_total:.1f} MB',
+                                    'downloading'
+                                )
+
+            # Atomic rename
+            os.rename(temp_path, dest_path)
+            report_progress(25, f'Download complete! Loading {model_name}...', 'loading')
+            return True
+
+        except Exception as e:
+            last_error = e
+            print(f"[WARN] Download failed from {try_url[:40]}...: {e}", file=sys.stderr)
+            # Clean up temp file on error
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            # Try next URL
+            continue
+
+    # All URLs failed
+    raise last_error if last_error else Exception("Download failed")
 
 
 class WhisperBackend(STTBackend):
@@ -49,39 +126,13 @@ class WhisperBackend(STTBackend):
 
     def _patch_whisper_urls_if_needed(self):
         """
-        Replace CDN URLs with direct blob storage URLs if CDN is unreachable.
-        This fixes DNS issues when accessing openaipublic.azureedge.net.
-        Fallback: openaipublic.blob.core.windows.net (slower but more reliable)
+        No longer pre-tests CDN - we handle fallback during actual download.
+        This method is kept for compatibility but doesn't modify URLs.
         """
         if self._url_patched:
             return
-
         self._url_patched = True
-
-        # Test if CDN is reachable
-        cdn_reachable = True
-        try:
-            import urllib.request
-            urllib.request.urlopen('https://openaipublic.azureedge.net/', timeout=5)
-        except Exception as e:
-            print(f"[INFO] Azure CDN unreachable ({e}), using fallback blob storage URLs", file=sys.stderr)
-            cdn_reachable = False
-
-        # If CDN works, no need to patch
-        if cdn_reachable:
-            print("[INFO] Using primary Azure CDN for Whisper downloads", file=sys.stderr)
-            return
-
-        # Patch all model URLs to use blob storage instead of CDN
-        if hasattr(self._whisper, '_MODELS'):
-            for model_name in list(self._whisper._MODELS.keys()):
-                original_url = self._whisper._MODELS[model_name]
-                fallback_url = original_url.replace(
-                    'openaipublic.azureedge.net',
-                    'openaipublic.blob.core.windows.net'
-                )
-                self._whisper._MODELS[model_name] = fallback_url
-            print("[INFO] Whisper URLs patched to use blob storage fallback", file=sys.stderr)
+        print("[INFO] Whisper backend initialized (CDN with blob fallback)", file=sys.stderr)
 
     def _get_model(self, model_name: str):
         """Load or return cached model."""
@@ -127,9 +178,61 @@ class WhisperBackend(STTBackend):
             else:
                 whisper = self._load_whisper()
                 print(f"[INFO] Loading Whisper model: {model_name}...", file=sys.stderr)
+
+                # Check if model needs to be downloaded
+                if not self.is_model_installed(model_name):
+                    # Download with live progress reporting
+                    self._download_model_with_progress(model_name)
+
+                # Now load the model (will use cached file)
+                report_progress(26, f'Loading {model_name} model...', 'loading')
                 self._current_model = whisper.load_model(model_name)
             self._current_model_name = model_name
         return self._current_model
+
+    def _download_model_with_progress(self, model_name: str):
+        """Download a Whisper model with live progress reporting."""
+        whisper = self._load_whisper()
+
+        # Get the download URL from whisper's model registry
+        if not hasattr(whisper, '_MODELS') or model_name not in whisper._MODELS:
+            print(f"[WARN] Model {model_name} not in whisper._MODELS, falling back to default download", file=sys.stderr)
+            return
+
+        cdn_url = whisper._MODELS[model_name]
+        # Create blob storage fallback URL
+        blob_url = cdn_url.replace('openaipublic.azureedge.net', 'openaipublic.blob.core.windows.net')
+
+        # Determine cache path
+        cache_dir = os.path.expanduser('~/.cache/whisper')
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # Model file naming
+        model_files = {
+            'tiny': 'tiny.pt',
+            'tiny.en': 'tiny.en.pt',
+            'base': 'base.pt',
+            'base.en': 'base.en.pt',
+            'small': 'small.pt',
+            'small.en': 'small.en.pt',
+            'medium': 'medium.pt',
+            'medium.en': 'medium.en.pt',
+            'large': 'large.pt',
+            'large-v1': 'large-v1.pt',
+            'large-v2': 'large-v2.pt',
+            'large-v3': 'large-v3.pt',
+            'turbo': 'large-v3-turbo.pt',
+        }
+
+        model_file = model_files.get(model_name, f'{model_name}.pt')
+        dest_path = os.path.join(cache_dir, model_file)
+
+        print(f"[INFO] Downloading {model_name} (CDN with blob fallback)...", file=sys.stderr)
+
+        # Use our custom download function with progress - tries CDN first, then blob
+        download_with_progress(cdn_url, dest_path, model_name, fallback_url=blob_url)
+
+        print(f"[INFO] Download complete: {dest_path}", file=sys.stderr)
 
     def transcribe(self, audio_path: str, model_name: str = 'base', **kwargs) -> Dict:
         """
@@ -149,24 +252,20 @@ class WhisperBackend(STTBackend):
             # Report initial progress
             report_progress(0, 'Starting transcription...', 'initializing')
 
-            # Check if model needs to be downloaded (works for ALL models)
-            if not self.is_model_installed(model_name):
-                model_info = self.MODELS.get(model_name)
-                model_size = model_info.size if model_info else '~1GB'
-                report_progress(5, f'Model not installed. Downloading {model_name} ({model_size})...', 'downloading')
-                print(f"[DOWNLOAD] Model {model_name} not found in cache. Downloading...", file=sys.stderr)
-
-            # Load model
+            # Check if model needs to be downloaded
             is_downloading = not self.is_model_installed(model_name)
             if is_downloading:
-                report_progress(10, f'Downloading {model_name}...', 'downloading')
+                model_info = self.MODELS.get(model_name)
+                model_size = model_info.size if model_info else '~1GB'
+                report_progress(5, f'Downloading {model_name} ({model_size})...', 'downloading')
             else:
                 report_progress(10, f'Loading {model_name} model...', 'loading_model')
 
+            # _get_model handles download with progress if needed
             model = self._get_model(model_name)
 
             if is_downloading:
-                report_progress(28, 'Download complete! Model loaded.', 'loaded')
+                report_progress(28, 'Model loaded!', 'loaded')
 
             # Audio is already converted to WAV (16kHz mono) by Electron (via ffmpeg-static)
             # Load audio with soundfile (no ffmpeg needed!)

@@ -47,6 +47,8 @@ export default defineConfig(({ mode }) => ({
       'react-native-safe-area-context': path.resolve(__dirname, './src/react/shims/safe-area-context.ts'),
       // Odd design system - use source files directly for better Vite resolution
       '@odd-design-system/ui-components/tamagui.config': path.resolve(__dirname, './odd-design-system/packages/ui-components/tamagui.config.ts'),
+      // Odd core UI - use source files directly
+      '@odd-core/ui': path.resolve(__dirname, './odd-core/packages/ui/src'),
       // Use browser crypto API instead of Node.js crypto
       'crypto': path.resolve(__dirname, './src/react/shims/crypto.ts'),
     },

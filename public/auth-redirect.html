@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VAI Studio - Signing In...</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: white;
+      padding: 20px;
+    }
+    .container {
+      text-align: center;
+      max-width: 400px;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 40px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 24px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p {
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.5;
+    }
+    .success { color: #22c55e; }
+    .error { color: #ef4444; }
+    .hidden { display: none; }
+    .button {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #3b82f6;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .button:hover { background: #2563eb; }
+    .fallback {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .fallback p {
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    code {
+      display: block;
+      background: rgba(0,0,0,0.3);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      word-break: break-all;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">V</div>
+    <h1 id="title">Opening VAI Studio...</h1>
+    <div class="spinner" id="spinner"></div>
+    <p id="message">Please wait while we redirect you to the app.</p>
+
+    <div id="fallback" class="fallback hidden">
+      <p>If the app didn't open automatically:</p>
+      <a id="fallback-link" href="#" class="button">Open VAI Studio</a>
+    </div>
+
+    <div id="error-fallback" class="fallback hidden">
+      <p>Or copy this link and paste it in your browser:</p>
+      <code id="manual-link"></code>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+
+      // Check for errors first
+      const error = params.get('error');
+      const errorDesc = params.get('error_description');
+
+      if (error) {
+        document.getElementById('title').textContent = 'Login Failed';
+        document.getElementById('title').className = 'error';
+        document.getElementById('spinner').classList.add('hidden');
+        document.getElementById('message').textContent = errorDesc || error;
+        return;
+      }
+
+      // Get tokens
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      const type = params.get('type');
+
+      if (!accessToken) {
+        document.getElementById('title').textContent = 'Invalid Link';
+        document.getElementById('title').className = 'error';
+        document.getElementById('spinner').classList.add('hidden');
+        document.getElementById('message').textContent = 'No authentication data found. Please try again.';
+        return;
+      }
+
+      // Build the deep link URL
+      const deepLinkParams = new URLSearchParams();
+      deepLinkParams.set('access_token', accessToken);
+      if (refreshToken) deepLinkParams.set('refresh_token', refreshToken);
+      if (type) deepLinkParams.set('type', type);
+
+      const deepLink = 'vai-studio://auth-callback?' + deepLinkParams.toString();
+
+      // Set up fallback link
+      document.getElementById('fallback-link').href = deepLink;
+      document.getElementById('manual-link').textContent = deepLink;
+
+      // Try to open the app
+      let appOpened = false;
+
+      // Method 1: iframe approach (works on some browsers)
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = deepLink;
+      document.body.appendChild(iframe);
+
+      // Method 2: Direct navigation (fallback)
+      setTimeout(function() {
+        window.location.href = deepLink;
+      }, 100);
+
+      // Show fallback after a delay
+      setTimeout(function() {
+        document.getElementById('title').textContent = 'Almost there!';
+        document.getElementById('spinner').classList.add('hidden');
+        document.getElementById('message').textContent = 'Click the button below if VAI Studio didn\'t open automatically.';
+        document.getElementById('fallback').classList.remove('hidden');
+      }, 2000);
+
+      // Show manual link as last resort
+      setTimeout(function() {
+        document.getElementById('error-fallback').classList.remove('hidden');
+      }, 5000);
+
+      // Listen for visibility change (app took focus)
+      document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+          appOpened = true;
+          document.getElementById('title').textContent = 'Success!';
+          document.getElementById('title').className = 'success';
+          document.getElementById('spinner').classList.add('hidden');
+          document.getElementById('message').textContent = 'You can close this tab.';
+          document.getElementById('fallback').classList.add('hidden');
+          document.getElementById('error-fallback').classList.add('hidden');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
