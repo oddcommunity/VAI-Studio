@@ -1,6 +1,17 @@
 // Load environment variables from .env file
 require('dotenv').config();
 
+// Handle EPIPE errors at process level (broken pipe when stdout/stderr closes)
+// This prevents crashes during app shutdown when logger tries to write to closed streams
+process.stdout.on('error', (err) => {
+  if (err.code === 'EPIPE') return; // Silently ignore
+  console.error('stdout error:', err);
+});
+process.stderr.on('error', (err) => {
+  if (err.code === 'EPIPE') return; // Silently ignore
+  // Can't log to stderr here, would be recursive
+});
+
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, crashReporter, systemPreferences, session, clipboard } = require('electron');
 const { spawn, execFile } = require('child_process');
 const path = require('path');
