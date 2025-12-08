@@ -46,14 +46,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
 
-  // User Authentication (Supabase)
+  // User Authentication (Supabase with PKCE security)
   auth: {
+    // Email magic link (uses state for CSRF protection)
     signInWithEmail: (email) => ipcRenderer.invoke('auth:sign-in-email', email),
+    // OAuth sign-in (uses PKCE + state, opens browser)
+    signInWithOAuth: (provider) => ipcRenderer.invoke('auth:sign-in-oauth', provider),
+    // Sign out
     signOut: () => ipcRenderer.invoke('auth:sign-out'),
+    // Session management
     getSession: () => ipcRenderer.invoke('auth:get-session'),
     checkModelAccess: (modelName) => ipcRenderer.invoke('auth:check-model-access', modelName),
     isAuthenticated: () => ipcRenderer.invoke('auth:is-authenticated'),
+    // Legacy: set session from tokens (prefer handleCallback for security)
     setSessionFromTokens: (accessToken, refreshToken) => ipcRenderer.invoke('auth:set-session-tokens', accessToken, refreshToken),
+    // Secure: handle callback URL with state validation
+    handleCallback: (callbackUrl) => ipcRenderer.invoke('auth:handle-callback', callbackUrl),
+    // Clear pending auth state (for cancellation/timeout)
+    clearPending: () => ipcRenderer.invoke('auth:clear-pending'),
     // Listen for auth success from deep link callback
     onAuthSuccess: (callback) => {
       const subscription = (event, data) => callback(data);

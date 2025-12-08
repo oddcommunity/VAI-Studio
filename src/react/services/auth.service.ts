@@ -1,9 +1,15 @@
 /**
  * Authentication Service
  * Handles HuggingFace and Supabase authentication
+ *
+ * Security: Uses PKCE and state parameters for OAuth flows
+ * to prevent authorization code interception and CSRF attacks.
  */
 
 import { electronBridge } from './electron.bridge'
+
+// OAuth provider type
+export type OAuthProvider = 'google' | 'github' | 'apple' | 'azure' | 'discord'
 
 export class AuthService {
   // HuggingFace Authentication
@@ -43,13 +49,22 @@ export class AuthService {
     return electronBridge.openHFTokenPage()
   }
 
-  // Supabase Authentication
+  // Supabase Authentication (with PKCE security)
 
   /**
    * Sign in with email (magic link)
+   * Uses state parameter for CSRF protection
    */
   async signInWithEmail(email: string) {
     return electronBridge.auth.signInWithEmail(email)
+  }
+
+  /**
+   * Sign in with OAuth provider
+   * Uses PKCE + state for security, opens browser for auth
+   */
+  async signInWithOAuth(provider: OAuthProvider) {
+    return electronBridge.auth.signInWithOAuth(provider)
   }
 
   /**
@@ -71,6 +86,38 @@ export class AuthService {
    */
   async checkModelAccess(modelName: string) {
     return electronBridge.auth.checkModelAccess(modelName)
+  }
+
+  /**
+   * Handle auth callback URL with state validation
+   * Use this when processing callback URLs from OAuth/magic link
+   */
+  async handleCallback(callbackUrl: string) {
+    return electronBridge.auth.handleCallback(callbackUrl)
+  }
+
+  /**
+   * Clear pending auth state
+   * Call this when user cancels auth flow or on timeout
+   */
+  async clearPending() {
+    return electronBridge.auth.clearPending()
+  }
+
+  /**
+   * Subscribe to auth success events
+   * Returns unsubscribe function
+   */
+  onAuthSuccess(callback: (data: { email?: string; userId?: string }) => void) {
+    return electronBridge.auth.onAuthSuccess(callback)
+  }
+
+  /**
+   * Subscribe to auth error events
+   * Returns unsubscribe function
+   */
+  onAuthError(callback: (data: { error?: string }) => void) {
+    return electronBridge.auth.onAuthError(callback)
   }
 }
 

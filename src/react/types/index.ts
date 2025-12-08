@@ -51,13 +51,25 @@ export interface ElectronAPI {
   clearHFToken(): Promise<{ success: boolean; error?: string }>;
   openHFTokenPage(): Promise<void>;
 
-  // Supabase Auth
+  // Supabase Auth (with PKCE security)
   auth: {
-    signInWithEmail(email: string): Promise<{ success: boolean; error?: string }>;
+    // Email magic link auth (uses state for CSRF protection)
+    signInWithEmail(email: string): Promise<{ success: boolean; state?: string; error?: string }>;
+    // OAuth sign-in (uses PKCE + state, opens browser)
+    signInWithOAuth(provider: string): Promise<{ success: boolean; url?: string; state?: string; error?: string }>;
+    // Sign out
     signOut(): Promise<{ success: boolean; error?: string }>;
+    // Session management
     getSession(): Promise<{ success: boolean; session?: AuthSession | null; error?: string }>;
     checkModelAccess(modelName: string): Promise<{ success: boolean; hasAccess?: boolean; error?: string }>;
     isAuthenticated(): Promise<{ success: boolean; isAuthenticated?: boolean; email?: string; error?: string }>;
+    // Legacy: set session from tokens (prefer handleCallback for security)
+    setSessionFromTokens?(accessToken: string, refreshToken: string): Promise<{ success: boolean; session?: AuthSession; error?: string }>;
+    // Secure: handle callback URL with state validation
+    handleCallback(callbackUrl: string): Promise<{ success: boolean; session?: AuthSession; user?: unknown; error?: string }>;
+    // Clear pending auth state (for cancellation/timeout)
+    clearPending(): Promise<{ success: boolean; error?: string }>;
+    // Event listeners
     onAuthSuccess(callback: (data: { email?: string; userId?: string }) => void): () => void;
     onAuthError(callback: (data: { error?: string }) => void): () => void;
   };

@@ -229,41 +229,24 @@ if (!gotTheLock) {
 
 /**
  * Handle authentication callback from deep link
- * URL format: vai-studio://auth-callback#access_token=...&refresh_token=...
+ * URL format: vai-studio://auth/callback?code=...&state=...
+ *
+ * Security: Validates state parameter to prevent CSRF attacks.
+ * The state must match the one generated when initiating the auth flow.
  */
 async function handleAuthCallback(url) {
   try {
-    logger.info('Processing auth callback', { url: url.substring(0, 50) + '...' });
+    logger.info('Processing secure auth callback', { url: url.substring(0, 50) + '...' });
 
-    // Parse the URL - tokens can be in query params (from redirect page) or hash fragment (direct)
-    const urlObj = new URL(url);
-
-    // Try query params first (from HTTPS redirect page)
-    let accessToken = urlObj.searchParams.get('access_token');
-    let refreshToken = urlObj.searchParams.get('refresh_token');
-
-    // Fall back to hash fragment (from direct Supabase redirect)
-    if (!accessToken && urlObj.hash) {
-      const hashParams = new URLSearchParams(urlObj.hash.substring(1));
-      accessToken = hashParams.get('access_token');
-      refreshToken = hashParams.get('refresh_token');
-    }
-
-    if (!accessToken) {
-      logger.error('No access token in callback URL');
-      if (mainWindow) {
-        mainWindow.webContents.send('auth-error', { error: 'No access token received' });
-      }
-      return;
-    }
-
-    logger.info('Tokens extracted from URL');
-
-    // Set the session using the tokens
-    const result = await authService.setSessionFromTokens(accessToken, refreshToken);
+    // Use the secure callback handler from authService
+    // This validates the state parameter and handles both implicit and code flows
+    const result = await authService.handleAuthCallback(url);
 
     if (result.success) {
-      logger.info('Authentication successful', { email: result.session?.user?.email });
+      logger.info('Authentication successful', {
+        email: result.session?.user?.email,
+        userId: result.session?.user?.id
+      });
 
       // Notify renderer of successful authentication
       if (mainWindow) {
@@ -271,11 +254,23 @@ async function handleAuthCallback(url) {
           email: result.session?.user?.email,
           userId: result.session?.user?.id
         });
+
+        // Focus the main window
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
       }
     } else {
-      logger.error('Failed to set session', { error: result.error });
+      const errorMsg = result.error || 'Authentication failed';
+
+      // Log with appropriate severity based on error type
+      if (errorMsg.includes('CSRF')) {
+        logger.warn('Auth callback rejected - possible CSRF attack', { error: errorMsg });
+      } else {
+        logger.error('Auth callback failed', { error: errorMsg });
+      }
+
       if (mainWindow) {
-        mainWindow.webContents.send('auth-error', { error: result.error });
+        mainWindow.webContents.send('auth-error', { error: errorMsg });
       }
     }
   } catch (error) {
@@ -1130,6 +1125,7 @@ ipcMain.handle('auth:is-authenticated', async () => {
 });
 
 // Set session from tokens (called from renderer when magic link redirects)
+// Note: Prefer using the secure callback handler when possible
 ipcMain.handle('auth:set-session-tokens', async (event, accessToken, refreshToken) => {
   try {
     logger.info('Setting session from tokens (renderer request)');
@@ -1141,7 +1137,49 @@ ipcMain.handle('auth:set-session-tokens', async (event, accessToken, refreshToke
   }
 });
 
-logger.info('User authentication system initialized');
+// Sign in with OAuth provider (opens browser for auth)
+ipcMain.handle('auth:sign-in-oauth', async (event, provider) => {
+  try {
+    logger.info('OAuth sign in request', { provider });
+    const result = await authService.signInWithOAuth(provider);
+
+    if (result.success && result.url) {
+      // Open the OAuth URL in the default browser
+      await shell.openExternal(result.url);
+      logger.info('Opened OAuth URL in browser', { provider });
+    }
+
+    return result;
+  } catch (error) {
+    logger.error('OAuth sign in failed', { provider, error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle auth callback URL (for manual processing from renderer)
+ipcMain.handle('auth:handle-callback', async (event, callbackUrl) => {
+  try {
+    logger.info('Handling auth callback from renderer');
+    const result = await authService.handleAuthCallback(callbackUrl);
+    return result;
+  } catch (error) {
+    logger.error('Handle callback failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear pending auth state (for cancellation/timeout)
+ipcMain.handle('auth:clear-pending', async () => {
+  try {
+    authService.clearPendingAuth();
+    return { success: true };
+  } catch (error) {
+    logger.error('Clear pending auth failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+logger.info('User authentication system initialized (with PKCE security)');
 
 // ========================================
 // HUGGINGFACE OAUTH AUTHENTICATION
