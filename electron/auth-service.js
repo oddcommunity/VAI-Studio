@@ -33,7 +33,7 @@ const DEEP_LINK_REDIRECT_URL = 'vai-studio://auth/callback';
 // Web bounce page that redirects to deep link (required for magic links)
 // Supabase rejects custom schemes in emailRedirectTo, so we use HTTPS bounce page
 // The ?app= param tells the bounce page which app scheme to redirect to
-const WEB_BOUNCE_URL = 'https://odd.community/auth/callback?app=vai-studio';
+const WEB_BOUNCE_URL = 'https://auth.odd.community/callback?app=vai-studio';
 
 // Email magic links: Use web bounce page (Supabase doesn't allow custom schemes)
 // OAuth: Use deep link directly (OAuth providers handle custom schemes better)

@@ -18,7 +18,8 @@
 
 ### Authentication Flow (Production)
 - **Deep Link**: `vai-studio://auth/callback`
-- **Supabase Dashboard**: Must allowlist `vai-studio://auth/callback` in Redirect URLs
+- **Web Bounce**: `https://auth.odd.community/callback?app=vai-studio`
+- **Supabase Dashboard**: Must allowlist both URLs in Redirect URLs
 - **Protocol**: Registered via `setAsDefaultProtocolClient('vai-studio')`
 
 ---

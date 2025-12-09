@@ -142,7 +142,7 @@
       if (refreshToken) deepLinkParams.set('refresh_token', refreshToken);
       if (type) deepLinkParams.set('type', type);
 
-      const deepLink = 'vai-studio://auth-callback?' + deepLinkParams.toString();
+      const deepLink = 'vai-studio://auth/callback?' + deepLinkParams.toString();
 
       // Set up fallback link
       document.getElementById('fallback-link').href = deepLink;
