@@ -1,5 +1,28 @@
 # VAI Studio - Development Guidelines
 
+## ⚠️ PRODUCTION MODE - READ FIRST
+
+**This app is ONE STEP away from production release.** All code must be production-ready.
+
+### Critical Production Rules
+
+1. **NO LOCALHOST** - Never use localhost for any functionality:
+   - No localhost callback servers
+   - No localhost URLs in auth flows
+   - Deep links (`vai-studio://`) are the ONLY way to handle auth callbacks
+   - If it doesn't work in a packaged app, it doesn't work
+
+2. **NO EXPERIMENTAL CODE** - Every feature must be complete and tested
+
+3. **NO DEV-ONLY WORKAROUNDS** - If it requires `--dev` flag or dev server to work, it's not production-ready
+
+### Authentication Flow (Production)
+- **Deep Link**: `vai-studio://auth/callback`
+- **Supabase Dashboard**: Must allowlist `vai-studio://auth/callback` in Redirect URLs
+- **Protocol**: Registered via `setAsDefaultProtocolClient('vai-studio')`
+
+---
+
 ## Architecture Overview
 
 VAI Studio is an Electron-based application that combines business logic with frontend and backend components. It relies on two core submodules for shared functionality:

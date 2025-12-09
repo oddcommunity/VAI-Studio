@@ -17,180 +17,28 @@ const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const http = require('http');
+// http module removed - localhost callback server replaced by deep links
 const ElectronStore = require('electron-store');
 const PDFDocument = require('pdfkit');
 
 // Initialize Odd-Core services
 const { getLogger } = require('./odd-core-integration');
-const { authService, AUTH_CALLBACK_PORT } = require('./auth-service');
+const { authService } = require('./auth-service');
+const { electronStorage, createElectronStorage } = require('../odd-core/packages/storage/dist/auth-storage/electron');
 const logger = getLogger();
 
-// Auth callback server for magic link redirects
-let authCallbackServer = null;
-
-function startAuthCallbackServer() {
-  if (authCallbackServer) return; // Already running
-
-  authCallbackServer = http.createServer(async (req, res) => {
-    // Parse the URL - Supabase sends tokens in the hash fragment
-    // But since hash isn't sent to server, we need to serve a page that extracts it
-    const url = new URL(req.url, `http://localhost:${AUTH_CALLBACK_PORT}`);
-
-    if (url.pathname === '/auth-callback') {
-      // Serve a simple HTML page that extracts tokens from hash and sends to Electron
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>VAI Studio - Signing In...</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              height: 100vh;
-              margin: 0;
-              background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-              color: white;
-            }
-            .container {
-              text-align: center;
-              padding: 40px;
-            }
-            h1 { margin-bottom: 20px; }
-            .spinner {
-              width: 40px;
-              height: 40px;
-              border: 3px solid rgba(255,255,255,0.3);
-              border-top-color: #3b82f6;
-              border-radius: 50%;
-              animation: spin 1s linear infinite;
-              margin: 20px auto;
-            }
-            @keyframes spin { to { transform: rotate(360deg); } }
-            .success { color: #22c55e; }
-            .error { color: #ef4444; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1 id="title">Signing you in...</h1>
-            <div class="spinner" id="spinner"></div>
-            <p id="message">Please wait while we complete your login.</p>
-          </div>
-          <script>
-            (async function() {
-              const hash = window.location.hash.substring(1);
-              if (!hash) {
-                document.getElementById('title').textContent = 'Error';
-                document.getElementById('title').className = 'error';
-                document.getElementById('spinner').style.display = 'none';
-                document.getElementById('message').textContent = 'No authentication data received.';
-                return;
-              }
-
-              const params = new URLSearchParams(hash);
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-              const error = params.get('error');
-              const errorDesc = params.get('error_description');
-
-              if (error) {
-                document.getElementById('title').textContent = 'Login Failed';
-                document.getElementById('title').className = 'error';
-                document.getElementById('spinner').style.display = 'none';
-                document.getElementById('message').textContent = errorDesc || error;
-                return;
-              }
-
-              if (accessToken) {
-                try {
-                  const response = await fetch('/complete-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ accessToken, refreshToken })
-                  });
-                  const result = await response.json();
-
-                  if (result.success) {
-                    document.getElementById('title').textContent = 'Success!';
-                    document.getElementById('title').className = 'success';
-                    document.getElementById('spinner').style.display = 'none';
-                    document.getElementById('message').textContent = 'You can close this window and return to VAI Studio.';
-                  } else {
-                    throw new Error(result.error || 'Authentication failed');
-                  }
-                } catch (e) {
-                  document.getElementById('title').textContent = 'Error';
-                  document.getElementById('title').className = 'error';
-                  document.getElementById('spinner').style.display = 'none';
-                  document.getElementById('message').textContent = e.message;
-                }
-              }
-            })();
-          </script>
-        </body>
-        </html>
-      `);
-    } else if (url.pathname === '/complete-auth' && req.method === 'POST') {
-      // Handle the token submission from the browser
-      let body = '';
-      req.on('data', chunk => body += chunk);
-      req.on('end', async () => {
-        try {
-          const { accessToken, refreshToken } = JSON.parse(body);
-          logger.info('Received auth tokens from browser callback');
-
-          const result = await authService.setSessionFromTokens(accessToken, refreshToken);
-
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-
-          if (result.success && mainWindow) {
-            // Notify the renderer of successful auth
-            mainWindow.webContents.send('auth-success', {
-              email: result.session?.user?.email,
-              userId: result.session?.user?.id
-            });
-            // Focus the main window
-            if (mainWindow.isMinimized()) mainWindow.restore();
-            mainWindow.focus();
-          }
-        } catch (error) {
-          logger.error('Failed to complete auth', { error: error.message });
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: error.message }));
-        }
-      });
-    } else {
-      res.writeHead(404);
-      res.end('Not Found');
+// Initialize the Electron storage adapter for Supabase auth persistence
+let storageInitialized = false;
+async function initializeStorage() {
+  if (storageInitialized) return;
+  try {
+    if (electronStorage.initialize) {
+      await electronStorage.initialize();
     }
-  });
-
-  authCallbackServer.listen(AUTH_CALLBACK_PORT, () => {
-    logger.info(`Auth callback server listening on port ${AUTH_CALLBACK_PORT}`);
-  });
-
-  authCallbackServer.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      logger.warn(`Auth callback port ${AUTH_CALLBACK_PORT} in use, trying next port`);
-      // Port in use, try next port
-      authCallbackServer = null;
-    } else {
-      logger.error('Auth callback server error', { error: err.message });
-    }
-  });
-}
-
-function stopAuthCallbackServer() {
-  if (authCallbackServer) {
-    authCallbackServer.close();
-    authCallbackServer = null;
-    logger.info('Auth callback server stopped');
+    storageInitialized = true;
+    logger.info('Electron storage adapter initialized');
+  } catch (error) {
+    logger.error('Failed to initialize electron storage', { error: error.message });
   }
 }
 
@@ -361,7 +209,10 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Initialize Electron storage adapter for Supabase auth persistence
+  await initializeStorage();
+
   // Initialize auto-updater after app is ready (Linear-style UX)
   const { autoUpdater: updater } = require('electron-updater');
   autoUpdater = updater;
@@ -412,9 +263,6 @@ app.whenReady().then(() => {
   authService.initialize().catch(err => {
     logger.error('Failed to initialize auth service', { error: err.message });
   });
-
-  // Start auth callback server for magic link redirects
-  startAuthCallbackServer();
 
   createWindow();
 
@@ -1068,6 +916,29 @@ function formatVTTTime(seconds) {
 }
 
 console.log('Electron main process ready');
+
+// ========================================
+// ODD-CORE STORAGE (for Supabase auth persistence)
+// ========================================
+// These IPC handlers allow the renderer process to access the shared storage
+
+ipcMain.handle('odd-storage-get', async (event, key) => {
+  return electronStorage.getItem(key);
+});
+
+ipcMain.handle('odd-storage-set', async (event, key, value) => {
+  return electronStorage.setItem(key, value);
+});
+
+ipcMain.handle('odd-storage-remove', async (event, key) => {
+  return electronStorage.removeItem(key);
+});
+
+ipcMain.handle('odd-storage-clear', async () => {
+  if (electronStorage.clear) {
+    return electronStorage.clear();
+  }
+});
 
 // ========================================
 // USER AUTHENTICATION (SUPABASE)

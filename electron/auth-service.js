@@ -5,33 +5,49 @@
  *
  * Security: Uses PKCE (RFC 7636) and state parameters to protect against
  * authorization code interception and CSRF attacks.
+ *
+ * Storage: Uses electronStorage adapter for unified session persistence
+ * across app restarts. No more separate localStorage vs ElectronStore.
  */
 
 const { AuthManager, parseAuthCallbackUrl } = require('@odd-core/auth');
+const { createClient } = require('@supabase/supabase-js');
 const { getLogger } = require('./odd-core-integration');
-const ElectronStore = require('electron-store');
+const { electronStorage } = require('../odd-core/packages/storage/dist/auth-storage/electron');
 
 const logger = getLogger();
-const store = new ElectronStore.default();
 
 // Supabase configuration
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://your-project.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'your-anon-key';
+
 const SUPABASE_CONFIG = {
-  supabaseUrl: process.env.SUPABASE_URL || 'https://your-project.supabase.co',
-  supabaseKey: process.env.SUPABASE_ANON_KEY || 'your-anon-key'
+  supabaseUrl: SUPABASE_URL,
+  supabaseKey: SUPABASE_KEY
 };
 
-// Auth callback configuration
-// In production, set AUTH_REDIRECT_URL env var to your HTTPS redirect page
-// e.g., https://vai.studio/auth-redirect.html
-const AUTH_CALLBACK_PORT = 54321;
-const AUTH_REDIRECT_URL = process.env.AUTH_REDIRECT_URL || `http://localhost:${AUTH_CALLBACK_PORT}/auth-callback`;
-
-// Deep link protocol for native auth callbacks
+// Auth callback configuration - PRODUCTION READY
+// Deep link for direct app protocol handling
 const DEEP_LINK_REDIRECT_URL = 'vai-studio://auth/callback';
+
+// Web bounce page that redirects to deep link (required for magic links)
+// Supabase rejects custom schemes in emailRedirectTo, so we use HTTPS bounce page
+// The ?app= param tells the bounce page which app scheme to redirect to
+const WEB_BOUNCE_URL = 'https://odd.community/auth/callback?app=vai-studio';
+
+// Email magic links: Use web bounce page (Supabase doesn't allow custom schemes)
+// OAuth: Use deep link directly (OAuth providers handle custom schemes better)
+const EMAIL_REDIRECT_URL = WEB_BOUNCE_URL;
+const OAUTH_REDIRECT_URL = DEEP_LINK_REDIRECT_URL;
+
+// Log the configured redirect URLs on module load
+console.log('[AuthService] Email redirect URL:', EMAIL_REDIRECT_URL);
+console.log('[AuthService] OAuth redirect URL:', OAUTH_REDIRECT_URL);
 
 class AuthService {
   constructor() {
     this.authManager = null;
+    this.supabaseClient = null; // Storage-enabled client for session persistence
     this.currentSession = null;
     this.initialized = false;
     // Track pending auth state for CSRF validation
@@ -49,10 +65,27 @@ class AuthService {
     }
 
     try {
-      // Initialize Odd-Core AuthManager
+      // Initialize electronStorage adapter
+      if (electronStorage.initialize) {
+        await electronStorage.initialize();
+        logger.info('Electron storage adapter initialized');
+      }
+
+      // Create storage-enabled Supabase client for session persistence
+      // This ensures sessions are persisted to disk and restored on app restart
+      this.supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: {
+          storage: electronStorage,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false, // We handle URL parsing manually
+        }
+      });
+
+      // Initialize Odd-Core AuthManager (for sign-in flows with PKCE)
       this.authManager = new AuthManager(SUPABASE_CONFIG);
 
-      // Try to restore session from storage
+      // Try to restore session from storage (now using electronStorage)
       await this.restoreSession();
 
       this.initialized = true;
@@ -69,20 +102,29 @@ class AuthService {
 
   /**
    * Restore session from storage
+   * Uses the storage-enabled Supabase client which automatically
+   * persists sessions to electronStorage
    */
   async restoreSession() {
     try {
-      const session = await this.authManager.getSession();
+      // Use storage-enabled client - it automatically reads from electronStorage
+      const { data: { session }, error } = await this.supabaseClient.auth.getSession();
+
+      if (error) {
+        logger.warn('Error getting session', { error: error.message });
+        return null;
+      }
 
       if (session) {
         this.currentSession = session;
-        logger.info('Session restored', {
+        logger.info('Session restored from electronStorage', {
           userId: session.user?.id,
           expiresAt: session.expires_at
         });
         return session;
       }
 
+      logger.info('No session found in storage');
       return null;
     } catch (error) {
       logger.error('Failed to restore session', {
@@ -102,13 +144,21 @@ class AuthService {
     }
 
     try {
-      logger.info('Sending secure OTP to email', { email, redirectTo: AUTH_REDIRECT_URL });
+      console.log('[AuthService] === SIGN IN WITH EMAIL ===');
+      console.log('[AuthService] Email:', email);
+      console.log('[AuthService] Redirect URL:', EMAIL_REDIRECT_URL);
 
-      // Use signInWithEmailSecure from AuthManager for CSRF protection
+      logger.info('Sending secure OTP to email', { email, redirectTo: EMAIL_REDIRECT_URL });
+
+      // Use signInWithEmailSecure from AuthManager
+      // Note: useState=false for email because appending ?state= to the redirect URL
+      // can cause Supabase allowlist matching issues with custom schemes
       const result = await this.authManager.signInWithEmailSecure(email, {
-        redirectUrl: AUTH_REDIRECT_URL,
-        useState: true
+        redirectUrl: EMAIL_REDIRECT_URL,
+        useState: false  // Don't append state to URL - causes allowlist mismatch
       });
+
+      console.log('[AuthService] signInWithEmailSecure completed successfully');
 
       // Store the state for callback validation
       this.pendingAuthState = result.state;
@@ -146,12 +196,13 @@ class AuthService {
     }
 
     try {
-      logger.info('Initiating secure OAuth flow', { provider, redirectTo: DEEP_LINK_REDIRECT_URL });
+      logger.info('Initiating secure OAuth flow', { provider, redirectTo: OAUTH_REDIRECT_URL });
 
       // Use signInWithOAuthSecure from AuthManager for PKCE + state protection
+      // OAuth uses deep link because browser is already in navigation mode
       const result = await this.authManager.signInWithOAuthSecure({
         provider,
-        redirectUrl: DEEP_LINK_REDIRECT_URL,
+        redirectUrl: OAUTH_REDIRECT_URL,
         usePKCE: true,
         useState: true
       });
@@ -207,6 +258,16 @@ class AuthService {
       );
 
       if (result.session) {
+        // Set session on storage-enabled client (auto-persists to electronStorage)
+        const { error: setError } = await this.supabaseClient.auth.setSession({
+          access_token: result.session.accessToken,
+          refresh_token: result.session.refreshToken
+        });
+
+        if (setError) {
+          logger.warn('Failed to persist session to storage', { error: setError.message });
+        }
+
         this.currentSession = {
           access_token: result.session.accessToken,
           refresh_token: result.session.refreshToken,
@@ -215,13 +276,10 @@ class AuthService {
           user: result.session.user
         };
 
-        // Mark user as permanently authenticated
-        store.set('vai_authenticated', true);
-        store.set('vai_user_email', result.session.user?.email || '');
-
         logger.info('Auth callback processed successfully', {
           userId: result.session.user?.id,
-          email: result.session.user?.email
+          email: result.session.user?.email,
+          persistedToStorage: !setError
         });
       }
 
@@ -256,6 +314,7 @@ class AuthService {
   /**
    * Set session from tokens (legacy method, prefer handleAuthCallback)
    * Kept for backwards compatibility with existing callback server
+   * Now uses storage-enabled client for automatic persistence
    */
   async setSessionFromTokens(accessToken, refreshToken) {
     if (!this.initialized) {
@@ -263,10 +322,10 @@ class AuthService {
     }
 
     try {
-      logger.info('Setting session from tokens (legacy method)');
+      logger.info('Setting session from tokens');
 
-      const client = this.authManager.getClient();
-      const { data, error } = await client.auth.setSession({
+      // Use storage-enabled client (auto-persists to electronStorage)
+      const { data, error } = await this.supabaseClient.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken
       });
@@ -277,11 +336,7 @@ class AuthService {
 
       this.currentSession = data.session;
 
-      // Mark user as permanently authenticated
-      store.set('vai_authenticated', true);
-      store.set('vai_user_email', data.session?.user?.email || '');
-
-      logger.info('Session set successfully', {
+      logger.info('Session set successfully (persisted to electronStorage)', {
         userId: data.session?.user?.id,
         email: data.session?.user?.email
       });
@@ -334,21 +389,23 @@ class AuthService {
   }
 
   /**
-   * Check if user has completed one-time authentication
+   * Check if user has a valid session (authenticated)
+   * Now uses the session from electronStorage instead of separate flag
    */
   isUserAuthenticated() {
-    return store.get('vai_authenticated', false);
+    return !!this.currentSession;
   }
 
   /**
-   * Get stored user email
+   * Get stored user email from current session
    */
   getStoredUserEmail() {
-    return store.get('vai_user_email', '');
+    return this.currentSession?.user?.email || '';
   }
 
   /**
    * Sign out current user
+   * Uses storage-enabled client to clear session from electronStorage
    */
   async signOut() {
     if (!this.initialized) {
@@ -358,10 +415,11 @@ class AuthService {
     try {
       const userId = this.currentSession?.user?.id;
 
-      await this.authManager.signOut();
+      // Sign out from storage-enabled client (clears from electronStorage)
+      await this.supabaseClient.auth.signOut();
       this.currentSession = null;
 
-      logger.info('User signed out', { userId });
+      logger.info('User signed out (session cleared from electronStorage)', { userId });
 
       return { success: true };
     } catch (error) {
@@ -377,7 +435,7 @@ class AuthService {
   }
 
   /**
-   * Get current session
+   * Get current session from storage-enabled client
    */
   async getSession() {
     if (!this.initialized) {
@@ -385,7 +443,12 @@ class AuthService {
     }
 
     try {
-      const session = await this.authManager.getSession();
+      const { data: { session }, error } = await this.supabaseClient.auth.getSession();
+
+      if (error) {
+        throw error;
+      }
+
       this.currentSession = session;
 
       return {
@@ -455,7 +518,5 @@ const authService = new AuthService();
 module.exports = {
   authService,
   AuthService,
-  AUTH_CALLBACK_PORT,
-  AUTH_REDIRECT_URL,
   DEEP_LINK_REDIRECT_URL
 };
