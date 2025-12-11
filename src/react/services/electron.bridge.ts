@@ -37,6 +37,10 @@ class ElectronBridge {
     return this.ensureAPI().selectMultipleAudioFiles()
   }
 
+  async selectImageFile() {
+    return this.ensureAPI().selectImageFile()
+  }
+
   async selectDirectory(options?: { defaultPath?: string; title?: string }) {
     return this.ensureAPI().selectDirectory(options)
   }

@@ -162,6 +162,39 @@ logger.info('Crash reporting initialized', {
 });
 
 function createWindow() {
+  // Configure CSP for both development and production
+  // Allow Supabase storage URLs for avatar images
+  // Note: CSP wildcards only match ONE subdomain level, so we need to be specific
+  // Using the full Supabase project URL pattern for storage
+  const supabaseStorageUrl = 'https://vjiexzktmduoguxvleiy.supabase.co https://*.supabase.co';
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    // Apply CSP for localhost (Vite dev server) or file:// (dist-react)
+    if (details.url.startsWith('http://localhost:3000') || details.url.startsWith('file://')) {
+      const isDevServer = details.url.startsWith('http://localhost:3000');
+      const baseSource = isDevServer ? 'http://localhost:3000' : "'self'";
+
+      const csp = [
+        `default-src 'self' ${isDevServer ? 'http://localhost:3000' : ''}`.trim(),
+        `script-src 'self' ${isDevServer ? "http://localhost:3000 'unsafe-eval'" : ''} 'unsafe-inline'`.trim(), // Vite needs eval for HMR
+        `style-src 'self' ${isDevServer ? 'http://localhost:3000' : ''} 'unsafe-inline' https://fonts.googleapis.com https://fonts.cdnfonts.com`.trim(),
+        `img-src 'self' ${isDevServer ? 'http://localhost:3000' : ''} data: ${supabaseStorageUrl}`.trim(),
+        `font-src 'self' ${isDevServer ? 'http://localhost:3000' : ''} https://fonts.googleapis.com https://fonts.gstatic.com https://fonts.cdnfonts.com`.trim(),
+        `connect-src 'self' ${isDevServer ? 'http://localhost:3000 ws://localhost:3000 ws://localhost:3001' : ''} ${supabaseStorageUrl}`.trim(), // ws for HMR
+        `media-src 'self' ${isDevServer ? 'http://localhost:3000' : ''} file:`.trim()
+      ].join('; ');
+
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [csp]
+        }
+      });
+    } else {
+      callback({ responseHeaders: details.responseHeaders });
+    }
+  });
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -180,24 +213,63 @@ function createWindow() {
   // Load React app (different paths for dev vs production)
   if (app.isPackaged) {
     // Production: load from dist-react
-    mainWindow.loadFile(path.join(__dirname, '../dist-react/index.html'));
+    const prodPath = path.join(__dirname, '../dist-react/index.html');
+    logger.info('[Production] Loading from:', prodPath);
+    mainWindow.loadFile(prodPath);
   } else {
     // Development: ALWAYS try Vite dev server first for hot reload
     // This ensures code changes are immediately visible without rebuilding
     const devServerUrl = 'http://localhost:3000';
     const distHtmlPath = path.join(__dirname, '../dist-react/index.html');
 
-    mainWindow.loadURL(devServerUrl).catch(() => {
+    logger.info('[Dev] App is NOT packaged - running in development mode');
+    logger.info('[Dev] Current working directory: ' + process.cwd());
+    logger.info('[Dev] __dirname: ' + __dirname);
+    logger.info('[Dev] Attempting to load Vite dev server: ' + devServerUrl);
+    logger.info('[Dev] Fallback path: ' + distHtmlPath);
+    logger.info('[Dev] Fallback path exists: ' + fs.existsSync(distHtmlPath));
+
+    // Load with explicit error handling
+    mainWindow.loadURL(devServerUrl).then(() => {
+      logger.info('[Dev] Successfully loaded Vite dev server');
+    }).catch((error) => {
+      logger.error('[Dev] Failed to load Vite dev server:', {
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorStack: error.stack
+      });
+
       // Fallback to built files if dev server not running
       if (fs.existsSync(distHtmlPath)) {
-        console.log('[Dev] Vite dev server not available, loading from dist-react');
-        mainWindow.loadFile(distHtmlPath);
+        logger.info('[Dev] Vite dev server not available, loading from dist-react');
+        mainWindow.loadFile(distHtmlPath).then(() => {
+          logger.info('[Dev] Successfully loaded from dist-react');
+        }).catch((fallbackError) => {
+          logger.error('[Dev] Failed to load from dist-react:', fallbackError.message);
+        });
       } else {
-        // Fallback to vanilla JS if nothing else available
-        mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
+        logger.error('[Dev] No built files found at:', distHtmlPath);
+        logger.error('[Dev] Cannot load app - no valid source found');
       }
     });
   }
+
+  // Add load event listeners for debugging
+  mainWindow.webContents.on('did-start-loading', () => {
+    logger.info('[Dev] Page started loading');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    logger.info('[Dev] Page finished loading successfully');
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    logger.error('[Dev] Page failed to load:', {
+      errorCode,
+      errorDescription,
+      url: validatedURL
+    });
+  });
 
   // Open DevTools only in development (--dev flag or when not packaged)
   if (process.argv.includes('--dev') || !app.isPackaged) {
@@ -707,6 +779,28 @@ ipcMain.handle('select-multiple-audio-files', async () => {
   }
 });
 
+// Open image file dialog (for avatar/profile)
+ipcMain.handle('select-image-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Image Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    return { success: true, filePath: result.filePaths[0] };
+  } catch (error) {
+    console.error('Error selecting image file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Select directory dialog
 ipcMain.handle('select-directory', async (event, { defaultPath, title }) => {
   try {
@@ -995,10 +1089,12 @@ ipcMain.handle('auth:is-authenticated', async () => {
   try {
     const isAuthenticated = authService.isUserAuthenticated();
     const email = authService.getStoredUserEmail();
+    const user = authService.getCurrentUser();
     return {
       success: true,
       isAuthenticated,
-      email
+      email,
+      userId: user?.id
     };
   } catch (error) {
     logger.error('Check authentication failed', { error: error.message });
@@ -1043,6 +1139,15 @@ ipcMain.handle('auth:handle-callback', async (event, callbackUrl) => {
   try {
     logger.info('Handling auth callback from renderer');
     const result = await authService.handleAuthCallback(callbackUrl);
+
+    // Emit auth-success event to update UI (same as deep link handler)
+    if (result.success && mainWindow) {
+      mainWindow.webContents.send('auth-success', {
+        email: result.session?.user?.email,
+        userId: result.session?.user?.id
+      });
+    }
+
     return result;
   } catch (error) {
     logger.error('Handle callback failed', { error: error.message });
@@ -1057,6 +1162,38 @@ ipcMain.handle('auth:clear-pending', async () => {
     return { success: true };
   } catch (error) {
     logger.error('Clear pending auth failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Get user profile (display name + avatar from Supabase)
+ipcMain.handle('auth:get-profile', async () => {
+  try {
+    return await authService.getProfile();
+  } catch (error) {
+    logger.error('Get profile failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Update user profile (display name and/or avatar URL)
+ipcMain.handle('auth:update-profile', async (event, { displayName, avatarUrl, phone }) => {
+  try {
+    return await authService.updateProfile({ displayName, avatarUrl, phone });
+  } catch (error) {
+    logger.error('Update profile failed', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Upload avatar image to Supabase storage
+ipcMain.handle('auth:upload-avatar', async (event, { imageData, mimeType }) => {
+  try {
+    // imageData comes as base64 string from renderer
+    const buffer = Buffer.from(imageData, 'base64');
+    return await authService.uploadAvatar(buffer, mimeType);
+  } catch (error) {
+    logger.error('Upload avatar failed', { error: error.message });
     return { success: false, error: error.message };
   }
 });
@@ -1233,6 +1370,60 @@ ipcMain.handle('test-hf-token', async (event, token) => {
 });
 
 console.log('[HuggingFace] Authentication system initialized');
+
+// ========================================
+// SETTINGS PERSISTENCE (electron-store)
+// ========================================
+
+const SETTINGS_STORE_KEY = 'vai-studio-settings';
+
+// Get all settings
+ipcMain.handle('settings:get', async () => {
+  try {
+    const settings = store.get(SETTINGS_STORE_KEY, null);
+    return { success: true, settings };
+  } catch (error) {
+    logger.error('Failed to get settings', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Save all settings
+ipcMain.handle('settings:set', async (event, settings) => {
+  try {
+    store.set(SETTINGS_STORE_KEY, settings);
+    return { success: true };
+  } catch (error) {
+    logger.error('Failed to save settings', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Update a single setting
+ipcMain.handle('settings:update', async (event, key, value) => {
+  try {
+    const current = store.get(SETTINGS_STORE_KEY, {});
+    current[key] = value;
+    store.set(SETTINGS_STORE_KEY, current);
+    return { success: true, settings: current };
+  } catch (error) {
+    logger.error('Failed to update setting', { error: error.message, key });
+    return { success: false, error: error.message };
+  }
+});
+
+// Reset settings to defaults
+ipcMain.handle('settings:reset', async () => {
+  try {
+    store.delete(SETTINGS_STORE_KEY);
+    return { success: true };
+  } catch (error) {
+    logger.error('Failed to reset settings', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+console.log('[Settings] Persistence system initialized');
 
 // ========================================
 // AUTO-UPDATE SYSTEM

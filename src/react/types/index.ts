@@ -26,10 +26,20 @@ export interface AuthSession {
   expires_at?: number;
 }
 
+// User profile data
+export interface UserProfile {
+  userId: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+}
+
 export interface ElectronAPI {
   // File Operations
   selectAudioFile(): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
   selectMultipleAudioFiles(): Promise<{ success: boolean; canceled?: boolean; filePaths?: string[] }>;
+  selectImageFile(): Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
   selectDirectory(options?: { defaultPath?: string; title?: string }): Promise<{ success: boolean; canceled?: boolean; directoryPath?: string }>;
   selectFromRecordings(): Promise<{ success: boolean; canceled?: boolean; filePath?: string; fileName?: string; duration?: number }>;
   getFileInfo(filePath: string): Promise<{ success: boolean; fileName?: string; fileSizeMB?: string }>;
@@ -62,13 +72,17 @@ export interface ElectronAPI {
     // Session management
     getSession(): Promise<{ success: boolean; session?: AuthSession | null; error?: string }>;
     checkModelAccess(modelName: string): Promise<{ success: boolean; hasAccess?: boolean; error?: string }>;
-    isAuthenticated(): Promise<{ success: boolean; isAuthenticated?: boolean; email?: string; error?: string }>;
+    isAuthenticated(): Promise<{ success: boolean; isAuthenticated?: boolean; email?: string; userId?: string; error?: string }>;
     // Legacy: set session from tokens (prefer handleCallback for security)
     setSessionFromTokens?(accessToken: string, refreshToken: string): Promise<{ success: boolean; session?: AuthSession; error?: string }>;
     // Secure: handle callback URL with state validation
     handleCallback(callbackUrl: string): Promise<{ success: boolean; session?: AuthSession; user?: unknown; error?: string }>;
     // Clear pending auth state (for cancellation/timeout)
     clearPending(): Promise<{ success: boolean; error?: string }>;
+    // Profile management
+    getProfile(): Promise<{ success: boolean; profile?: UserProfile; error?: string }>;
+    updateProfile(data: { displayName?: string; avatarUrl?: string; phone?: string }): Promise<{ success: boolean; error?: string }>;
+    uploadAvatar(data: { imageData: string; mimeType: string }): Promise<{ success: boolean; avatarUrl?: string; error?: string }>;
     // Event listeners
     onAuthSuccess(callback: (data: { email?: string; userId?: string }) => void): () => void;
     onAuthError(callback: (data: { error?: string }) => void): () => void;
@@ -87,6 +101,14 @@ export interface ElectronAPI {
 
   // Clipboard
   copyToClipboard(text: string): Promise<boolean>;
+
+  // Settings persistence (electron-store)
+  settings: {
+    get(): Promise<{ success: boolean; settings: UserSettings | null; error?: string }>;
+    set(settings: UserSettings): Promise<{ success: boolean; error?: string }>;
+    update<K extends keyof UserSettings>(key: K, value: UserSettings[K]): Promise<{ success: boolean; settings?: UserSettings; error?: string }>;
+    reset(): Promise<{ success: boolean; error?: string }>;
+  };
 }
 
 // Extend Window interface

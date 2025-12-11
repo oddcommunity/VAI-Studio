@@ -6,6 +6,7 @@ import {
   Button,
   H2,
   Checkbox,
+  Separator,
   useTheme,
 } from '@odd-design-system/ui-components'
 import { Check } from '@tamagui/lucide-icons'
@@ -18,6 +19,7 @@ import {
   CloseIcon,
 } from './Icons'
 import { GroupedModelSelector, ModelGroup } from './GroupedModelSelector'
+import { UserProfileMenu } from '../UserProfileMenu'
 
 export interface Model {
   id: string
@@ -50,6 +52,22 @@ export interface SidebarProps {
   onRemoveBatchFile?: (index: number) => void
   /** Callback to clear all batch files */
   onClearBatchFiles?: () => void
+  /** User profile - email */
+  userEmail?: string
+  /** User profile - display name */
+  userName?: string
+  /** User profile - avatar URL */
+  userAvatarUrl?: string
+  /** User profile - phone number */
+  userPhone?: string
+  /** Whether the user is authenticated */
+  isAuthenticated?: boolean
+  /** Callback when user signs out */
+  onSignOut?: () => void
+  /** Callback when user wants to sign in */
+  onSignIn?: () => void
+  /** Callback when profile is updated - passes new data for instant update */
+  onProfileUpdated?: (data: { name?: string; avatarUrl?: string; phone?: string }) => void
 }
 
 export function Sidebar({
@@ -73,6 +91,14 @@ export function Sidebar({
   batchFiles = [],
   onRemoveBatchFile,
   onClearBatchFiles,
+  userEmail,
+  userName,
+  userAvatarUrl,
+  userPhone,
+  isAuthenticated = false,
+  onSignOut,
+  onSignIn,
+  onProfileUpdated,
 }: SidebarProps) {
   const theme = useTheme()
   const [isMounted, setIsMounted] = useState(false)
@@ -463,6 +489,19 @@ export function Sidebar({
             Manage Models
           </Text>
         </Button>
+
+        {/* User Profile */}
+        <Separator marginVertical={8} backgroundColor="$color4" />
+        <UserProfileMenu
+          email={userEmail}
+          name={userName}
+          avatarUrl={userAvatarUrl}
+          phone={userPhone}
+          isAuthenticated={isAuthenticated}
+          onSignOut={onSignOut}
+          onSignIn={onSignIn}
+          onProfileUpdated={onProfileUpdated}
+        />
       </YStack>
     </YStack>
   )

@@ -14,12 +14,15 @@ const { AuthManager, parseAuthCallbackUrl } = require('@odd-core/auth');
 const { createClient } = require('@supabase/supabase-js');
 const { getLogger } = require('./odd-core-integration');
 const { electronStorage } = require('../odd-core/packages/storage/dist/auth-storage/electron');
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
 const logger = getLogger();
 
 // Supabase configuration
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://your-project.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'your-anon-key';
+// Note: The anon key is a PUBLIC key designed for client-side use.
+// It only provides access controlled by Row Level Security (RLS) policies.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vjiexzktmduoguxvleiy.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqaWV4emt0bWR1b2d1eHZsZWl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjU1MjEsImV4cCI6MjA3OTUwMTUyMX0.r7mYQfY6oguDLKZW7R-c7yKDWhwDBFB16IFDgNF1q4c';
 
 const SUPABASE_CONFIG = {
   supabaseUrl: SUPABASE_URL,
@@ -43,6 +46,53 @@ const OAUTH_REDIRECT_URL = DEEP_LINK_REDIRECT_URL;
 // Log the configured redirect URLs on module load
 console.log('[AuthService] Email redirect URL:', EMAIL_REDIRECT_URL);
 console.log('[AuthService] OAuth redirect URL:', OAUTH_REDIRECT_URL);
+
+/**
+ * Normalize phone number to E.164 format using libphonenumber-js
+ * (Google's phone number parsing library - industry standard)
+ *
+ * Accepts various formats:
+ * - US: "6175556453", "(617) 555-6453", "617-555-6453" → "+16175556453"
+ * - US with country code: "16175556453", "+16175556453" → "+16175556453"
+ * - International: "+447911123456", "+81312345678" → preserved as-is
+ *
+ * @param {string} phone - Raw phone number input
+ * @param {string} defaultCountry - Default country code (ISO 3166-1 alpha-2), defaults to 'US'
+ * @returns {string|null} - E.164 formatted number or null if invalid
+ */
+function normalizePhoneNumber(phone, defaultCountry = 'US') {
+  if (!phone) return null;
+
+  try {
+    // Parse with default country for numbers without country code
+    const phoneNumber = parsePhoneNumberFromString(phone, defaultCountry);
+
+    if (!phoneNumber) {
+      // If parsing fails, try without default country (for fully qualified numbers)
+      const phoneNumberNoDefault = parsePhoneNumberFromString(phone);
+      if (phoneNumberNoDefault && phoneNumberNoDefault.isValid()) {
+        return phoneNumberNoDefault.number; // E.164 format
+      }
+      return null;
+    }
+
+    // Return E.164 format if valid, otherwise null
+    if (phoneNumber.isValid()) {
+      return phoneNumber.number; // E.164 format, e.g., "+16175556453"
+    }
+
+    // If not strictly valid but possible, still return E.164
+    // (allows slightly malformed but recognizable numbers)
+    if (phoneNumber.isPossible()) {
+      return phoneNumber.number;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[AuthService] Phone number parsing error:', error.message);
+    return null;
+  }
+}
 
 class AuthService {
   constructor() {
@@ -239,6 +289,12 @@ class AuthService {
   /**
    * Handle auth callback URL with state validation (SECURE)
    * This is the primary method for processing auth callbacks
+   *
+   * Supports two flows:
+   * 1. PKCE flow (magic links): URL contains ?token_hash=...&type=email
+   *    - Uses verifyOtp() to exchange token_hash for session
+   * 2. Implicit flow (OAuth): URL contains #access_token=...
+   *    - Uses AuthManager.handleAuthCallback() to parse tokens
    */
   async handleAuthCallback(callbackUrl) {
     if (!this.initialized) {
@@ -247,21 +303,64 @@ class AuthService {
 
     try {
       logger.info('Handling secure auth callback', {
-        urlPrefix: callbackUrl.substring(0, 50) + '...',
+        urlPrefix: callbackUrl.substring(0, 80) + '...',
         hasPendingState: !!this.pendingAuthState
       });
 
-      // Use AuthManager's secure callback handler with state validation
-      const result = await this.authManager.handleAuthCallback(
-        callbackUrl,
-        this.pendingAuthState // Pass expected state for validation
-      );
+      // Parse URL to detect flow type
+      const url = new URL(callbackUrl);
+      const tokenHash = url.searchParams.get('token_hash');
+      const type = url.searchParams.get('type');
 
-      if (result.session) {
+      let session = null;
+      let user = null;
+
+      if (tokenHash && type) {
+        // PKCE flow: Exchange token_hash for session using verifyOtp
+        logger.info('PKCE flow detected - exchanging token_hash via verifyOtp', { type });
+
+        const { data, error } = await this.supabaseClient.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: type // 'email' for magic links
+        });
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (data.session) {
+          session = {
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+            expiresIn: data.session.expires_in || 3600,
+            tokenType: data.session.token_type || 'bearer',
+            user: data.session.user
+          };
+          user = data.user;
+        }
+
+        logger.info('PKCE token exchange successful', {
+          userId: data.user?.id,
+          email: data.user?.email
+        });
+      } else {
+        // Implicit flow (OAuth): Use AuthManager's handler for hash fragment tokens
+        logger.info('Implicit flow detected - parsing tokens from URL hash');
+
+        const result = await this.authManager.handleAuthCallback(
+          callbackUrl,
+          this.pendingAuthState // Pass expected state for validation
+        );
+
+        session = result.session;
+        user = result.user;
+      }
+
+      if (session) {
         // Set session on storage-enabled client (auto-persists to electronStorage)
         const { error: setError } = await this.supabaseClient.auth.setSession({
-          access_token: result.session.accessToken,
-          refresh_token: result.session.refreshToken
+          access_token: session.accessToken,
+          refresh_token: session.refreshToken
         });
 
         if (setError) {
@@ -269,16 +368,16 @@ class AuthService {
         }
 
         this.currentSession = {
-          access_token: result.session.accessToken,
-          refresh_token: result.session.refreshToken,
-          expires_in: result.session.expiresIn,
-          token_type: result.session.tokenType,
-          user: result.session.user
+          access_token: session.accessToken,
+          refresh_token: session.refreshToken,
+          expires_in: session.expiresIn,
+          token_type: session.tokenType,
+          user: session.user
         };
 
         logger.info('Auth callback processed successfully', {
-          userId: result.session.user?.id,
-          email: result.session.user?.email,
+          userId: session.user?.id,
+          email: session.user?.email,
           persistedToStorage: !setError
         });
       }
@@ -289,8 +388,8 @@ class AuthService {
 
       return {
         success: true,
-        session: result.session,
-        user: result.user
+        session: session,
+        user: user
       };
     } catch (error) {
       // Clear pending state on error too
@@ -509,6 +608,276 @@ class AuthService {
     // Other models require HuggingFace token
     // This will be checked separately
     return false;
+  }
+
+  /**
+   * Get user profile data (display name, avatar, phone from user_metadata and auth)
+   */
+  async getProfile() {
+    if (!this.initialized) {
+      throw new Error('Auth service not initialized');
+    }
+
+    if (!this.currentSession?.user?.id) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+      const userId = this.currentSession.user.id;
+
+      // Get user data (includes metadata and phone)
+      const { data: { user }, error: userError } = await this.supabaseClient.auth.getUser();
+
+      if (userError) {
+        throw userError;
+      }
+
+      // Try to get display_name from profiles table as fallback
+      let profileDisplayName = null;
+      try {
+        const { data: profileData, error: profileError } = await this.supabaseClient
+          .from('profiles')
+          .select('display_name')
+          .eq('user_id', userId)
+          .single();
+
+        // PGRST116 = no rows found, which is OK for new users
+        if (!profileError || profileError.code === 'PGRST116') {
+          profileDisplayName = profileData?.display_name;
+        }
+      } catch (e) {
+        // profiles table might not exist - that's OK
+      }
+
+      // Priority: user_metadata.full_name > user_metadata.display_name > profiles.display_name > user_metadata.name
+      const displayName = user?.user_metadata?.full_name
+        || user?.user_metadata?.display_name
+        || profileDisplayName
+        || user?.user_metadata?.name
+        || null;
+
+      const phone = user?.user_metadata?.phone || user?.phone || null;
+      console.log('[AuthService] getProfile - user_metadata.phone:', user?.user_metadata?.phone, '| auth.phone:', user?.phone, '| resolved:', phone);
+
+      return {
+        success: true,
+        profile: {
+          userId,
+          email: user?.email || this.currentSession.user.email,
+          displayName,
+          avatarUrl: user?.user_metadata?.avatar_url || null,
+          // Phone stored in user_metadata (top-level auth.phone requires SMS provider)
+          phone
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get profile', { error: error.message });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Update user profile (display name, avatar URL, phone)
+   * All profile data is stored in user_metadata for visibility in Supabase dashboard
+   * Phone is also updated via Supabase auth phone field
+   */
+  async updateProfile({ displayName, avatarUrl, phone }) {
+    if (!this.initialized) {
+      throw new Error('Auth service not initialized');
+    }
+
+    if (!this.currentSession?.user?.id) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+      const userId = this.currentSession.user.id;
+      logger.info('Updating user profile', {
+        userId,
+        hasDisplayName: !!displayName,
+        hasAvatarUrl: !!avatarUrl,
+        hasPhone: !!phone
+      });
+
+      // Build update payload for user_metadata
+      const updateData = {};
+
+      if (displayName !== undefined) {
+        updateData.full_name = displayName;  // Supabase convention for display name
+        updateData.display_name = displayName;  // Also store as display_name for backwards compat
+      }
+
+      if (avatarUrl !== undefined) {
+        updateData.avatar_url = avatarUrl;
+      }
+
+      // Store phone in user_metadata (not as top-level auth.phone)
+      // Top-level phone requires SMS provider to be configured in Supabase
+      // Storing in metadata avoids SMS verification requirement
+      // Normalize to E.164 format for future compatibility
+      if (phone !== undefined) {
+        updateData.phone = phone ? normalizePhoneNumber(phone) : null;
+      }
+
+      // Build auth update payload
+      const authUpdate = {};
+
+      if (Object.keys(updateData).length > 0) {
+        authUpdate.data = updateData;
+      }
+
+      // Update user if there's anything to update
+      if (Object.keys(authUpdate).length > 0) {
+        console.log('[AuthService] Calling updateUser with:', JSON.stringify(authUpdate, null, 2));
+        const { data: updateData2, error: userError } = await this.supabaseClient.auth.updateUser(authUpdate);
+
+        if (userError) {
+          console.error('[AuthService] updateUser error:', userError);
+          throw userError;
+        }
+        console.log('[AuthService] updateUser success, user_metadata:', JSON.stringify(updateData2?.user?.user_metadata, null, 2));
+        logger.info('User profile updated', { userId, fields: Object.keys(authUpdate), phone: updateData2?.user?.user_metadata?.phone });
+      }
+
+      // Also update profiles table for backwards compatibility
+      if (displayName !== undefined) {
+        const { error: profileError } = await this.supabaseClient
+          .from('profiles')
+          .upsert({
+            user_id: userId,
+            display_name: displayName,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
+
+        if (profileError) {
+          // Log but don't fail - profiles table might not exist
+          logger.warn('Failed to update profiles table (may not exist)', { error: profileError.message });
+        }
+      }
+
+      // Refresh current session to get updated user_metadata
+      const { data: { session } } = await this.supabaseClient.auth.refreshSession();
+      if (session) {
+        this.currentSession = session;
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to update profile', { error: error.message });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Upload avatar image to Supabase storage and update user metadata
+   * @param {Buffer} imageBuffer - The image data as a Buffer
+   * @param {string} mimeType - The MIME type of the image
+   */
+  async uploadAvatar(imageBuffer, mimeType) {
+    if (!this.initialized) {
+      throw new Error('Auth service not initialized');
+    }
+
+    if (!this.currentSession?.user?.id) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+      const userId = this.currentSession.user.id;
+      logger.info('Uploading avatar', { userId, mimeType, size: imageBuffer.length });
+
+      // DEBUG: Verify Supabase client has an active session
+      let { data: { session: clientSession }, error: sessionError } = await this.supabaseClient.auth.getSession();
+      if (sessionError) {
+        logger.error('Failed to get session from Supabase client', { error: sessionError.message });
+      }
+
+      // If client doesn't have session but we have one stored, explicitly set it
+      if (!clientSession && this.currentSession) {
+        logger.warn('Supabase client missing session - explicitly setting from stored session');
+        const { data: { session: restoredSession }, error: setError } = await this.supabaseClient.auth.setSession({
+          access_token: this.currentSession.access_token,
+          refresh_token: this.currentSession.refresh_token
+        });
+        if (setError) {
+          logger.error('Failed to set session on Supabase client', { error: setError.message });
+        } else {
+          clientSession = restoredSession;
+          logger.info('Session explicitly set on Supabase client');
+        }
+      }
+
+      logger.info('Supabase client session state', {
+        hasClientSession: !!clientSession,
+        clientUserId: clientSession?.user?.id,
+        localUserId: userId,
+        hasAccessToken: !!clientSession?.access_token,
+        tokenPrefix: clientSession?.access_token?.substring(0, 20) + '...'
+      });
+
+      // Validate mime type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(mimeType)) {
+        return { success: false, error: `Invalid file type. Allowed: ${allowedTypes.join(', ')}` };
+      }
+
+      // Generate filename
+      const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+      const ext = extMap[mimeType] || 'jpg';
+      const fileName = `${userId}/${Date.now()}.${ext}`;
+
+      // Upload to avatars bucket
+      logger.info('Attempting upload', { fileName, bucket: 'avatars', contentType: mimeType });
+      const { data: uploadData, error: uploadError } = await this.supabaseClient.storage
+        .from('avatars')
+        .upload(fileName, imageBuffer, {
+          contentType: mimeType,
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        // Log full error details
+        logger.error('Upload error details', {
+          message: uploadError.message,
+          name: uploadError.name,
+          statusCode: uploadError.statusCode,
+          error: uploadError.error,
+          cause: uploadError.cause,
+          fullError: JSON.stringify(uploadError, Object.getOwnPropertyNames(uploadError))
+        });
+        throw uploadError;
+      }
+
+      logger.info('Upload successful', { uploadData });
+
+      // Get public URL
+      const { data: { publicUrl } } = this.supabaseClient.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update user metadata with avatar URL
+      const { error: updateError } = await this.supabaseClient.auth.updateUser({
+        data: { avatar_url: publicUrl }
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Refresh session
+      const { data: { session } } = await this.supabaseClient.auth.refreshSession();
+      if (session) {
+        this.currentSession = session;
+      }
+
+      logger.info('Avatar uploaded successfully', { userId, publicUrl });
+
+      return { success: true, avatarUrl: publicUrl };
+    } catch (error) {
+      logger.error('Failed to upload avatar', { error: error.message });
+      return { success: false, error: error.message };
+    }
   }
 }
 

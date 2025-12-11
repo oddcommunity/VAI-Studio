@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Select multiple audio files
   selectMultipleAudioFiles: () => ipcRenderer.invoke('select-multiple-audio-files'),
 
+  // Select image file (for avatar/profile)
+  selectImageFile: () => ipcRenderer.invoke('select-image-file'),
+
   // Select directory
   selectDirectory: (options = {}) => ipcRenderer.invoke('select-directory', options),
 
@@ -64,6 +67,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     handleCallback: (callbackUrl) => ipcRenderer.invoke('auth:handle-callback', callbackUrl),
     // Clear pending auth state (for cancellation/timeout)
     clearPending: () => ipcRenderer.invoke('auth:clear-pending'),
+    // Profile management
+    getProfile: () => ipcRenderer.invoke('auth:get-profile'),
+    updateProfile: ({ displayName, avatarUrl, phone }) => ipcRenderer.invoke('auth:update-profile', { displayName, avatarUrl, phone }),
+    uploadAvatar: ({ imageData, mimeType }) => ipcRenderer.invoke('auth:upload-avatar', { imageData, mimeType }),
     // Listen for auth success from deep link callback
     onAuthSuccess: (callback) => {
       const subscription = (event, data) => callback(data);
@@ -116,6 +123,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Clipboard (uses IPC for sandboxed renderer)
   copyToClipboard: (text) => ipcRenderer.invoke('clipboard-write', text),
+
+  // Settings persistence (electron-store - survives across app restarts)
+  settings: {
+    get: () => ipcRenderer.invoke('settings:get'),
+    set: (settings) => ipcRenderer.invoke('settings:set', settings),
+    update: (key, value) => ipcRenderer.invoke('settings:update', key, value),
+    reset: () => ipcRenderer.invoke('settings:reset'),
+  },
 });
 
 console.log('Preload script loaded');

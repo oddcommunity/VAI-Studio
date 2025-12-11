@@ -4,7 +4,7 @@ import {
   XStack,
   Text,
   Button,
-  Sheet,
+  Dialog,
   Progress,
   ScrollView,
   Tabs,
@@ -173,101 +173,97 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
   const availableModels = getAvailableModels()
 
   return (
-    <Sheet
+    <Dialog
       modal
       open={open}
       onOpenChange={(isOpen: boolean) => !isOpen && onClose()}
-      snapPoints={[85]}
-      dismissOnSnapToBottom
-      zIndex={Z_INDEX.MODAL}
     >
-      <Sheet.Overlay backgroundColor="rgba(0,0,0,0.75)" />
-      <Sheet.Frame backgroundColor="$secondary1" borderTopLeftRadius={16} borderTopRightRadius={16}>
-        <Sheet.Handle backgroundColor="$secondary4" />
-
-        {/* Header */}
-        <XStack
-          padding={20}
-          borderBottomWidth={1}
-          borderBottomColor="$secondary3"
-          alignItems="center"
-          justifyContent="space-between"
+      <Dialog.Portal>
+        <Dialog.Overlay
+          key="overlay"
+          animation="quick"
+          opacity={0.75}
+          enterStyle={{ opacity: 0 }}
+          exitStyle={{ opacity: 0 }}
+          backgroundColor="rgba(0,0,0,0.75)"
+          zIndex={Z_INDEX.MODAL}
+        />
+        <Dialog.Content
+          key="content"
+          bordered
+          elevate
+          animation={[
+            'quick',
+            {
+              opacity: {
+                overshootClamping: true,
+              },
+            },
+          ]}
+          enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.95 }}
+          exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+          backgroundColor="$secondary1"
+          borderRadius={16}
+          padding={0}
+          width="90%"
+          maxWidth={700}
+          maxHeight="85vh"
+          zIndex={Z_INDEX.MODAL + 1}
         >
-          <XStack alignItems="center" gap={12}>
-            <FolderOpen size={24} color="$secondary9" />
-            <Text fontSize={18} fontWeight="600" color="$secondary11">
-              Model Manager
-            </Text>
-          </XStack>
-          <XStack gap={8}>
-            <Button
-              size="$3"
-              chromeless
-              onPress={loadBackends}
-              disabled={loading}
-              hoverStyle={{ backgroundColor: '$secondary3' }}
-              icon={<RefreshCw size={16} color="$secondary7" />}
-            />
-            <Button
-              size="$3"
-              circular
-              chromeless
-              onPress={onClose}
-              hoverStyle={{ backgroundColor: '$secondary3' }}
-            >
-              <X size={20} color="$secondary7" />
-            </Button>
-          </XStack>
-        </XStack>
-
-        {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          orientation="horizontal"
-          flexDirection="column"
-          flex={1}
-        >
-          <Tabs.List
-            paddingHorizontal={20}
-            paddingTop={12}
+          {/* Header */}
+          <XStack
+            padding={20}
             borderBottomWidth={1}
             borderBottomColor="$secondary3"
+            alignItems="center"
+            justifyContent="space-between"
           >
-            <Tabs.Tab
-              value="installed"
-              backgroundColor={activeTab === 'installed' ? '$secondary3' : 'transparent'}
-              borderRadius={6}
-              paddingHorizontal={16}
-              paddingVertical={8}
-            >
-              <Text
-                fontSize={14}
-                fontWeight="500"
-                color={activeTab === 'installed' ? '$secondary11' : '$secondary7'}
-              >
-                Installed ({installedModels.length})
+            <XStack alignItems="center" gap={12}>
+              <FolderOpen size={24} color="$secondary9" />
+              <Text fontSize={18} fontWeight="600" color="$secondary11">
+                Model Manager
               </Text>
-            </Tabs.Tab>
-            <Tabs.Tab
-              value="available"
-              backgroundColor={activeTab === 'available' ? '$secondary3' : 'transparent'}
-              borderRadius={6}
-              paddingHorizontal={16}
-              paddingVertical={8}
+            </XStack>
+            <XStack gap={8}>
+              <Button
+                size="$3"
+                chromeless
+                onPress={loadBackends}
+                disabled={loading}
+                hoverStyle={{ backgroundColor: '$secondary3' }}
+                icon={<RefreshCw size={16} color="$secondary7" />}
+              />
+              <Dialog.Close asChild>
+                <Button
+                  size="$3"
+                  circular
+                  chromeless
+                  onPress={onClose}
+                  hoverStyle={{ backgroundColor: '$secondary3' }}
+                >
+                  <X size={20} color="$secondary7" />
+                </Button>
+              </Dialog.Close>
+            </XStack>
+          </XStack>
+
+          {/* Tabs */}
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            orientation="horizontal"
+            flexDirection="column"
+            flex={1}
+          >
+            <Tabs.List
+              paddingHorizontal={20}
+              paddingTop={12}
+              borderBottomWidth={1}
+              borderBottomColor="$secondary3"
             >
-              <Text
-                fontSize={14}
-                fontWeight="500"
-                color={activeTab === 'available' ? '$secondary11' : '$secondary7'}
-              >
-                Available ({availableModels.length})
-              </Text>
-            </Tabs.Tab>
-            {Object.keys(downloads).length > 0 && (
               <Tabs.Tab
-                value="downloads"
-                backgroundColor={activeTab === 'downloads' ? '$secondary3' : 'transparent'}
+                value="installed"
+                backgroundColor={activeTab === 'installed' ? '$secondary3' : 'transparent'}
                 borderRadius={6}
                 paddingHorizontal={16}
                 paddingVertical={8}
@@ -275,213 +271,247 @@ export function ModelManagerModal({ open, onClose }: ModelManagerModalProps) {
                 <Text
                   fontSize={14}
                   fontWeight="500"
-                  color={activeTab === 'downloads' ? '$primary8' : '$primary6'}
+                  color={activeTab === 'installed' ? '$secondary11' : '$secondary7'}
                 >
-                  Downloads ({Object.keys(downloads).length})
+                  Installed ({installedModels.length})
                 </Text>
               </Tabs.Tab>
-            )}
-          </Tabs.List>
-
-          <Tabs.Content value="installed" flex={1}>
-            <ScrollView flex={1} padding={20}>
-              {installedModels.length === 0 ? (
-                <YStack alignItems="center" justifyContent="center" padding={48} gap={16}>
-                  <HardDrive size={48} color="$secondary5" />
-                  <Text fontSize={16} color="$secondary7" textAlign="center">
-                    No models installed yet
-                  </Text>
-                  <Button
-                    size="$3"
-                    chromeless
-                    onPress={() => setActiveTab('available')}
-                    hoverStyle={{ backgroundColor: '$secondary3' }}
+              <Tabs.Tab
+                value="available"
+                backgroundColor={activeTab === 'available' ? '$secondary3' : 'transparent'}
+                borderRadius={6}
+                paddingHorizontal={16}
+                paddingVertical={8}
+              >
+                <Text
+                  fontSize={14}
+                  fontWeight="500"
+                  color={activeTab === 'available' ? '$secondary11' : '$secondary7'}
+                >
+                  Available ({availableModels.length})
+                </Text>
+              </Tabs.Tab>
+              {Object.keys(downloads).length > 0 && (
+                <Tabs.Tab
+                  value="downloads"
+                  backgroundColor={activeTab === 'downloads' ? '$secondary3' : 'transparent'}
+                  borderRadius={6}
+                  paddingHorizontal={16}
+                  paddingVertical={8}
+                >
+                  <Text
+                    fontSize={14}
+                    fontWeight="500"
+                    color={activeTab === 'downloads' ? '$primary8' : '$primary6'}
                   >
-                    <Text fontSize={14} color="$primary8">
-                      Browse available models
-                    </Text>
-                  </Button>
-                </YStack>
-              ) : (
-                <YStack gap={12}>
-                  {installedModels.map(({ backend, model }) => (
-                    <ModelCard key={`${backend}-${model.name}`}>
-                      <XStack alignItems="flex-start" justifyContent="space-between">
-                        <YStack gap={4} flex={1}>
-                          <Text fontSize={15} fontWeight="600" color="$secondary11">
-                            {model.name}
-                          </Text>
-                          <Text fontSize={12} color="$secondary6">
-                            {backend}
-                          </Text>
-                        </YStack>
-                        <Badge variant="installed">
-                          <CheckCircle size={12} color="hsl(142, 76%, 36%)" />
-                          <Text fontSize={11} color="hsl(142, 76%, 36%)">
-                            Installed
-                          </Text>
-                        </Badge>
-                      </XStack>
-
-                      <XStack gap={16} flexWrap="wrap">
-                        <XStack gap={4} alignItems="center">
-                          <HardDrive size={12} color="$secondary6" />
-                          <Text fontSize={12} color="$secondary7">
-                            {model.size}
-                          </Text>
-                        </XStack>
-                        {model.params && (
-                          <XStack gap={4} alignItems="center">
-                            <Cpu size={12} color="$secondary6" />
-                            <Text fontSize={12} color="$secondary7">
-                              {model.params}
-                            </Text>
-                          </XStack>
-                        )}
-                        {model.wer && (
-                          <Text fontSize={12} color="$secondary7">
-                            WER: {model.wer}
-                          </Text>
-                        )}
-                      </XStack>
-                    </ModelCard>
-                  ))}
-                </YStack>
-              )}
-            </ScrollView>
-          </Tabs.Content>
-
-          <Tabs.Content value="available" flex={1}>
-            <ScrollView flex={1} padding={20}>
-              {availableModels.length === 0 ? (
-                <YStack alignItems="center" justifyContent="center" padding={48} gap={16}>
-                  <CheckCircle size={48} color="hsl(142, 76%, 36%)" />
-                  <Text fontSize={16} color="$secondary7" textAlign="center">
-                    All available models are installed!
+                    Downloads ({Object.keys(downloads).length})
                   </Text>
-                </YStack>
-              ) : (
-                <YStack gap={12}>
-                  {availableModels.map(({ backend, model }) => {
-                    const downloadKey = `${backend}-${model.name}`
-                    const isDownloading = !!downloads[downloadKey]
+                </Tabs.Tab>
+              )}
+            </Tabs.List>
 
-                    return (
-                      <ModelCard key={downloadKey}>
-                        <XStack alignItems="flex-start" justifyContent="space-between">
-                          <YStack gap={4} flex={1}>
-                            <Text fontSize={15} fontWeight="600" color="$secondary11">
-                              {model.name}
-                            </Text>
-                            <Text fontSize={12} color="$secondary6">
-                              {backend}
-                            </Text>
-                          </YStack>
-                          {!isDownloading && (
-                            <Button
-                              size="$3"
-                              backgroundColor="$primary6"
-                              hoverStyle={{ backgroundColor: '$primary5' }}
-                              onPress={() => handleDownloadModel(backend, model.name)}
-                              icon={<Download size={14} color="#FFFFFF" />}
-                            >
-                              <Text fontSize={12} fontWeight="500" color="#FFFFFF">
-                                Download
+            <ScrollView maxHeight="calc(85vh - 160px)" showsVerticalScrollIndicator>
+              <Tabs.Content value="installed">
+                <YStack padding={20}>
+                  {installedModels.length === 0 ? (
+                    <YStack alignItems="center" justifyContent="center" padding={48} gap={16}>
+                      <HardDrive size={48} color="$secondary5" />
+                      <Text fontSize={16} color="$secondary7" textAlign="center">
+                        No models installed yet
+                      </Text>
+                      <Button
+                        size="$3"
+                        chromeless
+                        onPress={() => setActiveTab('available')}
+                        hoverStyle={{ backgroundColor: '$secondary3' }}
+                      >
+                        <Text fontSize={14} color="$primary8">
+                          Browse available models
+                        </Text>
+                      </Button>
+                    </YStack>
+                  ) : (
+                    <YStack gap={12}>
+                      {installedModels.map(({ backend, model }) => (
+                        <ModelCard key={`${backend}-${model.name}`}>
+                          <XStack alignItems="flex-start" justifyContent="space-between">
+                            <YStack gap={4} flex={1}>
+                              <Text fontSize={15} fontWeight="600" color="$secondary11">
+                                {model.name}
                               </Text>
-                            </Button>
-                          )}
-                        </XStack>
-
-                        <XStack gap={16} flexWrap="wrap">
-                          <XStack gap={4} alignItems="center">
-                            <HardDrive size={12} color="$secondary6" />
-                            <Text fontSize={12} color="$secondary7">
-                              {model.size}
-                            </Text>
+                              <Text fontSize={12} color="$secondary6">
+                                {backend}
+                              </Text>
+                            </YStack>
+                            <Badge variant="installed">
+                              <CheckCircle size={12} color="hsl(142, 76%, 36%)" />
+                              <Text fontSize={11} color="hsl(142, 76%, 36%)">
+                                Installed
+                              </Text>
+                            </Badge>
                           </XStack>
-                          {model.params && (
+
+                          <XStack gap={16} flexWrap="wrap">
                             <XStack gap={4} alignItems="center">
-                              <Cpu size={12} color="$secondary6" />
+                              <HardDrive size={12} color="$secondary6" />
                               <Text fontSize={12} color="$secondary7">
-                                {model.params}
+                                {model.size}
                               </Text>
                             </XStack>
-                          )}
-                          {model.wer && (
-                            <Text fontSize={12} color="$secondary7">
-                              WER: {model.wer}
-                            </Text>
-                          )}
-                        </XStack>
+                            {model.params && (
+                              <XStack gap={4} alignItems="center">
+                                <Cpu size={12} color="$secondary6" />
+                                <Text fontSize={12} color="$secondary7">
+                                  {model.params}
+                                </Text>
+                              </XStack>
+                            )}
+                            {model.wer && (
+                              <Text fontSize={12} color="$secondary7">
+                                WER: {model.wer}
+                              </Text>
+                            )}
+                          </XStack>
+                        </ModelCard>
+                      ))}
+                    </YStack>
+                  )}
+                </YStack>
+              </Tabs.Content>
 
-                        {isDownloading && downloads[downloadKey] && (
+              <Tabs.Content value="available">
+                <YStack padding={20}>
+                  {availableModels.length === 0 ? (
+                    <YStack alignItems="center" justifyContent="center" padding={48} gap={16}>
+                      <CheckCircle size={48} color="hsl(142, 76%, 36%)" />
+                      <Text fontSize={16} color="$secondary7" textAlign="center">
+                        All available models are installed!
+                      </Text>
+                    </YStack>
+                  ) : (
+                    <YStack gap={12}>
+                      {availableModels.map(({ backend, model }) => {
+                        const downloadKey = `${backend}-${model.name}`
+                        const isDownloading = !!downloads[downloadKey]
+
+                        return (
+                          <ModelCard key={downloadKey}>
+                            <XStack alignItems="flex-start" justifyContent="space-between">
+                              <YStack gap={4} flex={1}>
+                                <Text fontSize={15} fontWeight="600" color="$secondary11">
+                                  {model.name}
+                                </Text>
+                                <Text fontSize={12} color="$secondary6">
+                                  {backend}
+                                </Text>
+                              </YStack>
+                              {!isDownloading && (
+                                <Button
+                                  size="$3"
+                                  backgroundColor="$primary6"
+                                  hoverStyle={{ backgroundColor: '$primary5' }}
+                                  onPress={() => handleDownloadModel(backend, model.name)}
+                                  icon={<Download size={14} color="#FFFFFF" />}
+                                >
+                                  <Text fontSize={12} fontWeight="500" color="#FFFFFF">
+                                    Download
+                                  </Text>
+                                </Button>
+                              )}
+                            </XStack>
+
+                            <XStack gap={16} flexWrap="wrap">
+                              <XStack gap={4} alignItems="center">
+                                <HardDrive size={12} color="$secondary6" />
+                                <Text fontSize={12} color="$secondary7">
+                                  {model.size}
+                                </Text>
+                              </XStack>
+                              {model.params && (
+                                <XStack gap={4} alignItems="center">
+                                  <Cpu size={12} color="$secondary6" />
+                                  <Text fontSize={12} color="$secondary7">
+                                    {model.params}
+                                  </Text>
+                                </XStack>
+                              )}
+                              {model.wer && (
+                                <Text fontSize={12} color="$secondary7">
+                                  WER: {model.wer}
+                                </Text>
+                              )}
+                            </XStack>
+
+                            {isDownloading && downloads[downloadKey] && (
+                              <YStack gap={8}>
+                                <Progress
+                                  value={downloads[downloadKey].progress}
+                                  max={100}
+                                  backgroundColor="$secondary4"
+                                >
+                                  <Progress.Indicator backgroundColor="$primary6" />
+                                </Progress>
+                                <Text fontSize={11} color="$secondary6">
+                                  {downloads[downloadKey].message}
+                                </Text>
+                              </YStack>
+                            )}
+                          </ModelCard>
+                        )
+                      })}
+                    </YStack>
+                  )}
+                </YStack>
+              </Tabs.Content>
+
+              <Tabs.Content value="downloads">
+                <YStack padding={20}>
+                  {Object.keys(downloads).length === 0 ? (
+                    <YStack alignItems="center" justifyContent="center" padding={48} gap={16}>
+                      <Download size={48} color="$secondary5" />
+                      <Text fontSize={16} color="$secondary7" textAlign="center">
+                        No active downloads
+                      </Text>
+                    </YStack>
+                  ) : (
+                    <YStack gap={12}>
+                      {Object.entries(downloads).map(([key, download]) => (
+                        <ModelCard key={key}>
+                          <XStack alignItems="center" justifyContent="space-between">
+                            <YStack gap={4}>
+                              <Text fontSize={15} fontWeight="600" color="$secondary11">
+                                {download.modelName}
+                              </Text>
+                              <Text fontSize={12} color="$secondary6">
+                                {download.backend}
+                              </Text>
+                            </YStack>
+                            <Badge variant="downloading">
+                              <Download size={12} color="$primary8" />
+                              <Text fontSize={11} color="$primary8">
+                                {Math.round(download.progress)}%
+                              </Text>
+                            </Badge>
+                          </XStack>
+
                           <YStack gap={8}>
-                            <Progress
-                              value={downloads[downloadKey].progress}
-                              max={100}
-                              backgroundColor="$secondary4"
-                            >
+                            <Progress value={download.progress} max={100} backgroundColor="$secondary4">
                               <Progress.Indicator backgroundColor="$primary6" />
                             </Progress>
                             <Text fontSize={11} color="$secondary6">
-                              {downloads[downloadKey].message}
+                              {download.message}
                             </Text>
                           </YStack>
-                        )}
-                      </ModelCard>
-                    )
-                  })}
+                        </ModelCard>
+                      ))}
+                    </YStack>
+                  )}
                 </YStack>
-              )}
+              </Tabs.Content>
             </ScrollView>
-          </Tabs.Content>
-
-          <Tabs.Content value="downloads" flex={1}>
-            <ScrollView flex={1} padding={20}>
-              {Object.keys(downloads).length === 0 ? (
-                <YStack alignItems="center" justifyContent="center" padding={48} gap={16}>
-                  <Download size={48} color="$secondary5" />
-                  <Text fontSize={16} color="$secondary7" textAlign="center">
-                    No active downloads
-                  </Text>
-                </YStack>
-              ) : (
-                <YStack gap={12}>
-                  {Object.entries(downloads).map(([key, download]) => (
-                    <ModelCard key={key}>
-                      <XStack alignItems="center" justifyContent="space-between">
-                        <YStack gap={4}>
-                          <Text fontSize={15} fontWeight="600" color="$secondary11">
-                            {download.modelName}
-                          </Text>
-                          <Text fontSize={12} color="$secondary6">
-                            {download.backend}
-                          </Text>
-                        </YStack>
-                        <Badge variant="downloading">
-                          <Download size={12} color="$primary8" />
-                          <Text fontSize={11} color="$primary8">
-                            {Math.round(download.progress)}%
-                          </Text>
-                        </Badge>
-                      </XStack>
-
-                      <YStack gap={8}>
-                        <Progress value={download.progress} max={100} backgroundColor="$secondary4">
-                          <Progress.Indicator backgroundColor="$primary6" />
-                        </Progress>
-                        <Text fontSize={11} color="$secondary6">
-                          {download.message}
-                        </Text>
-                      </YStack>
-                    </ModelCard>
-                  ))}
-                </YStack>
-              )}
-            </ScrollView>
-          </Tabs.Content>
-        </Tabs>
-      </Sheet.Frame>
-    </Sheet>
+          </Tabs>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog>
   )
 }

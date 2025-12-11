@@ -46,18 +46,30 @@
     const urlParams = new URLSearchParams(window.location.search);
     const hash = window.location.hash;
 
-    // Get app from query param (passed via emailRedirectTo)
+    // Get app from query param
     const appId = urlParams.get('app') || DEFAULT_APP;
     const scheme = APP_SCHEMES[appId] || APP_SCHEMES[DEFAULT_APP];
 
+    // PKCE flow params (magic link with token_hash)
+    const tokenHash = urlParams.get('token_hash');
+    const type = urlParams.get('type');
+
     document.getElementById('title').textContent = `Opening ${appId}...`;
 
-    if (hash) {
-      // Build deep link with tokens
-      const deepLink = `${scheme}://auth/callback${hash}`;
-      window.location.href = deepLink;
+    let deepLink = null;
 
-      // Fallback message
+    if (tokenHash && type) {
+      // PKCE flow: pass token_hash to app for exchange via verifyOtp
+      deepLink = `${scheme}://auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}`;
+      window.location.href = deepLink;
+    } else if (hash) {
+      // Implicit flow (OAuth): tokens in URL hash
+      deepLink = `${scheme}://auth/callback${hash}`;
+      window.location.href = deepLink;
+    }
+
+    if (deepLink) {
+      // Fallback message if app doesn't open
       setTimeout(() => {
         document.getElementById('message').innerHTML =
           `If the app didn't open, <a href="${deepLink}">click here</a>`;

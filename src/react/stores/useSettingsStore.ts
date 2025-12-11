@@ -43,7 +43,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       hasCompletedOnboarding: updates.hasCompletedOnboarding ?? current.hasCompletedOnboarding
     }
 
-    settingsService.saveSettings(newSettings)
+    settingsService.saveSettingsSync(newSettings)
     set(newSettings)
   },
 

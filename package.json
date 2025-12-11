@@ -35,6 +35,12 @@
   "build": {
     "appId": "com.vaistudio.app",
     "productName": "VAI Studio",
+    "protocols": {
+      "name": "VAI Studio Protocol",
+      "schemes": [
+        "vai-studio"
+      ]
+    },
     "directories": {
       "output": "dist"
     },
@@ -61,10 +67,6 @@
           "!**/*.pyc",
           "!**/*.pyo"
         ]
-      },
-      {
-        "from": "test_audio.wav",
-        "to": "test_audio.wav"
       },
       {
         "from": "scripts/python-wrapper.sh",
@@ -135,6 +137,7 @@
     "electron-store": "^11.0.2",
     "electron-updater": "^6.1.7",
     "ffmpeg-static": "^5.3.0",
+    "libphonenumber-js": "^1.12.31",
     "pdfkit": "^0.17.2",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",

@@ -14,11 +14,35 @@ import type { TranscriptionResultItem } from '../components/ResultsPanel'
 interface VAIStudioFeatureScreenProps {
   onAdvancedSettings?: () => void
   onManageModels?: () => void
+  /** User profile - email */
+  userEmail?: string
+  /** User profile - display name */
+  userName?: string
+  /** User profile - avatar URL */
+  userAvatarUrl?: string
+  /** User profile - phone number */
+  userPhone?: string
+  /** Whether the user is authenticated */
+  isAuthenticated?: boolean
+  /** Callback when user signs out */
+  onSignOut?: () => void
+  /** Callback when user wants to sign in */
+  onSignIn?: () => void
+  /** Callback when profile is updated - passes new data for instant update */
+  onProfileUpdated?: (data: { name?: string; avatarUrl?: string; phone?: string }) => void
 }
 
 export function VAIStudioFeatureScreen({
   onAdvancedSettings,
   onManageModels,
+  userEmail,
+  userName,
+  userAvatarUrl,
+  userPhone,
+  isAuthenticated,
+  onSignOut,
+  onSignIn,
+  onProfileUpdated,
 }: VAIStudioFeatureScreenProps) {
   // Global state
   const {
@@ -376,6 +400,14 @@ export function VAIStudioFeatureScreen({
       batchFiles={batchFiles}
       onRemoveBatchFile={removeBatchFile}
       onClearBatchFiles={clearBatchFiles}
+      userEmail={userEmail}
+      userName={userName}
+      userAvatarUrl={userAvatarUrl}
+      userPhone={userPhone}
+      isAuthenticated={isAuthenticated}
+      onSignOut={onSignOut}
+      onSignIn={onSignIn}
+      onProfileUpdated={onProfileUpdated}
     >
       {hasResults ? (
         <ResultsPanel

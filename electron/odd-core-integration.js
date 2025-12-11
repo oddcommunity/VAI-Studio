@@ -5,6 +5,7 @@
 
 const { Logger } = require('@odd-core/log');
 const { ApiClient } = require('@odd-core/api');
+const { version } = require('../package.json');
 
 // Initialize logger for VAI Studio
 const logger = new Logger({
@@ -29,7 +30,7 @@ function initializeApiClient(baseURL) {
       retries: 3,
       headers: {
         'X-Client': 'VAI-Studio',
-        'X-Client-Version': '3.0.1'
+        'X-Client-Version': version
       }
     });
     logger.info('API client initialized successfully', { baseURL });

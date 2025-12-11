@@ -51,6 +51,22 @@ export interface VAIStudioProps {
   onRemoveBatchFile?: (index: number) => void
   /** Callback to clear all batch files */
   onClearBatchFiles?: () => void
+  /** User profile - email */
+  userEmail?: string
+  /** User profile - display name */
+  userName?: string
+  /** User profile - avatar URL */
+  userAvatarUrl?: string
+  /** User profile - phone number */
+  userPhone?: string
+  /** Whether the user is authenticated */
+  isAuthenticated?: boolean
+  /** Callback when user signs out */
+  onSignOut?: () => void
+  /** Callback when user wants to sign in */
+  onSignIn?: () => void
+  /** Callback when profile is updated - passes new data for instant update */
+  onProfileUpdated?: (data: { name?: string; avatarUrl?: string; phone?: string }) => void
 }
 
 export function VAIStudio({
@@ -77,6 +93,14 @@ export function VAIStudio({
   batchFiles = [],
   onRemoveBatchFile,
   onClearBatchFiles,
+  userEmail,
+  userName,
+  userAvatarUrl,
+  userPhone,
+  isAuthenticated = false,
+  onSignOut,
+  onSignIn,
+  onProfileUpdated,
 }: VAIStudioProps) {
   return (
     <XStack
@@ -110,6 +134,14 @@ export function VAIStudio({
         batchFiles={batchFiles}
         onRemoveBatchFile={onRemoveBatchFile}
         onClearBatchFiles={onClearBatchFiles}
+        userEmail={userEmail}
+        userName={userName}
+        userAvatarUrl={userAvatarUrl}
+        userPhone={userPhone}
+        isAuthenticated={isAuthenticated}
+        onSignOut={onSignOut}
+        onSignIn={onSignIn}
+        onProfileUpdated={onProfileUpdated}
       />
 
       {/* Main Content Area */}
