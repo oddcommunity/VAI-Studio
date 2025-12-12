@@ -76,8 +76,8 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        "dmg",
-        "zip"
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
       ],
       "icon": "assets/icon.icns",
       "darkModeSupport": true,
@@ -85,7 +85,8 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "type": "distribution"
+      "type": "distribution",
+      "notarize": false
     },
     "win": {
       "target": [
@@ -110,9 +111,8 @@
       "createStartMenuShortcut": true
     },
     "publish": {
-      "provider": "github",
-      "owner": "oddcommunity",
-      "repo": "VAI-Studio"
+      "provider": "generic",
+      "url": "https://updates.odd.community/releases/vai-studio"
     }
   },
   "dependencies": {

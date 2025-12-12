@@ -21,6 +21,21 @@
 - **Web Bounce**: `https://auth.odd.community/callback?app=vai-studio`
 - **Supabase Dashboard**: Must allowlist both URLs in Redirect URLs
 - **Protocol**: Registered via `setAsDefaultProtocolClient('vai-studio')`
+- **Full Guide**: See `odd-core/docs/ELECTRON_AUTH_GUIDE.md`
+
+### Auto-Updater (Production)
+- **Update Server**: `https://updates.odd.community/releases/vai-studio`
+- **Provider**: Generic (not GitHub releases)
+- **Manifests**: `latest-mac.yml`, `latest.yml`, `latest-linux.yml`
+- **Architectures**: macOS arm64 + x64, Windows x64, Linux x64
+- **Full Guide**: See `odd-core/docs/AUTO_UPDATE_GUIDE.md`
+
+### Shared Supabase Backend
+All Odd Community apps use the **same Supabase project**:
+- **URL**: `https://vjiexzktmduoguxvleiy.supabase.co`
+- **One account** works across all apps (VAI Studio, Privately, Hansel, etc.)
+- **Shared OAuth providers** (Google, GitHub, Apple)
+- **Per-app subscriptions** via `subscriptions.app_code`
 
 ---
 

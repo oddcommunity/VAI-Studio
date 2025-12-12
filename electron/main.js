@@ -288,9 +288,18 @@ app.whenReady().then(async () => {
   // Initialize auto-updater after app is ready (Linear-style UX)
   const { autoUpdater: updater } = require('electron-updater');
   autoUpdater = updater;
+
+  // Configure update server - all Odd Community apps use updates.odd.community
+  autoUpdater.setFeedURL({
+    provider: 'generic',
+    url: 'https://updates.odd.community/releases/vai-studio'
+  });
+
   autoUpdater.autoDownload = true; // Download silently in background
   autoUpdater.autoInstallOnAppQuit = true;
-  logger.info('Auto-update system initialized');
+  logger.info('Auto-update system initialized', {
+    feedURL: 'https://updates.odd.community/releases/vai-studio'
+  });
 
   // Set up auto-updater event handlers
   autoUpdater.on('checking-for-update', () => {
@@ -331,10 +340,13 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Initialize authentication service
-  authService.initialize().catch(err => {
+  // Initialize authentication service BEFORE creating window
+  // This ensures session is restored before the renderer checks auth state
+  try {
+    await authService.initialize();
+  } catch (err) {
     logger.error('Failed to initialize auth service', { error: err.message });
-  });
+  }
 
   createWindow();
 
