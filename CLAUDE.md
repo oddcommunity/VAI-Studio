@@ -30,6 +30,33 @@
 - **Architectures**: macOS arm64 + x64, Windows x64, Linux x64
 - **Full Guide**: See `odd-core/docs/AUTO_UPDATE_GUIDE.md`
 
+### Code Signing & Notarization (Production Builds)
+
+**Required environment variables for signed builds:**
+
+```bash
+# macOS Code Signing (Developer ID certificate)
+export CSC_LINK=/path/to/developer-id-application.p12   # or base64 encoded
+export CSC_KEY_PASSWORD=certificate-password
+
+# macOS Notarization (required for Gatekeeper)
+export APPLE_ID=your@apple.id
+export APPLE_APP_SPECIFIC_PASSWORD=xxxx-xxxx-xxxx-xxxx  # From appleid.apple.com
+export APPLE_TEAM_ID=XXXXXXXXXX                          # 10-character Team ID
+
+# Windows Code Signing (EV certificate)
+export CSC_LINK=/path/to/windows-ev-cert.pfx
+export CSC_KEY_PASSWORD=certificate-password
+# Or for cloud-based signing:
+export WIN_CSC_LINK=https://...
+export WIN_CSC_KEY_PASSWORD=...
+```
+
+**To build without signing (dev/testing):**
+```bash
+CSC_IDENTITY_AUTO_DISCOVERY=false pnpm run build:mac
+```
+
 ### Shared Supabase Backend
 All Odd Community apps use the **same Supabase project**:
 - **URL**: `https://vjiexzktmduoguxvleiy.supabase.co`

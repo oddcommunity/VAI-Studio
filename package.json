@@ -76,8 +76,20 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] },
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.icns",
       "darkModeSupport": true,
@@ -86,14 +98,21 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "type": "distribution",
-      "notarize": false
+      "notarize": {
+        "teamId": "${APPLE_TEAM_ID}"
+      }
     },
+    "afterSign": "scripts/notarize.js",
     "win": {
       "target": [
         "nsis",
         "portable"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "signDlls": true
     },
     "linux": {
       "target": [
@@ -149,6 +168,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
