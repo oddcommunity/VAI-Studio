@@ -44,7 +44,8 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'index.html')
+        main: path.resolve(__dirname, 'index.html'),
+        'onboarding-overlay': path.resolve(__dirname, 'onboarding-overlay.html'),
       },
       output: {
         manualChunks: {
@@ -79,6 +80,7 @@ export default defineConfig(({ mode }) => ({
       // Odd core UI - use web-only entry points to avoid Expo dependency issues
       '@odd-core/ui/hooks-web-only': path.resolve(__dirname, './odd-core/packages/ui/dist/hooks-web-only.mjs'),
       '@odd-core/ui/hooks': path.resolve(__dirname, './odd-core/packages/ui/dist/hooks/index.mjs'),
+      '@odd-core/ui/immersive-onboarding': path.resolve(__dirname, './odd-core/packages/ui/dist/features/immersive-onboarding/index.mjs'),
       '@odd-core/ui': path.resolve(__dirname, './odd-core/packages/ui/dist/index.mjs'),
       // Odd core storage - use web-only entry point to avoid Expo dependencies
       '@odd-core/storage/web-only': path.resolve(__dirname, './odd-core/packages/storage/dist/web-only.mjs'),

@@ -1,6 +1,6 @@
 {
   "name": "vai-studio",
-  "version": "3.0.1",
+  "version": "1.0.0",
   "description": "VAI Studio - Test and compare Speech-to-Text models locally",
   "main": "electron/main.js",
   "scripts": {
@@ -157,6 +157,7 @@
     "electron-updater": "^6.1.7",
     "ffmpeg-static": "^5.3.0",
     "libphonenumber-js": "^1.12.31",
+    "lottie-react": "^2.4.1",
     "pdfkit": "^0.17.2",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",

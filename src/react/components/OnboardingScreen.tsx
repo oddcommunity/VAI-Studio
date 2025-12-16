@@ -4,9 +4,55 @@
  * First-run onboarding flow for new users.
  */
 
-import React, { useState, useCallback } from 'react'
-import { YStack, XStack, Text, H2, Button, Paragraph } from '@odd-design-system/ui-components'
+import React, { useState, useCallback, useEffect } from 'react'
+import { YStack, XStack, Text, H2, Button, Paragraph, styled } from '@odd-design-system/ui-components'
 import Svg, { Path, Rect, Line, Polyline } from 'react-native-svg'
+
+// Floating animation wrapper using Tamagui's animation system
+// Mimics CSS: animation: float 3s ease-in-out infinite
+// 0%/100% -> y:0, 50% -> y:-10px
+const FloatingContainer = styled(YStack, {
+  animation: 'slow',
+  variants: {
+    floating: {
+      up: { y: -10 },
+      down: { y: 0 },
+    },
+  } as const,
+})
+
+// Hook to create continuous floating animation (3s cycle, ease-in-out)
+function useFloatingAnimation() {
+  const [floating, setFloating] = useState<'up' | 'down'>('down')
+
+  useEffect(() => {
+    // Toggle every 1.5 seconds (half of 3s cycle)
+    // This creates: down -> up (1.5s) -> down (1.5s) = 3s total cycle
+    const interval = setInterval(() => {
+      setFloating(prev => prev === 'down' ? 'up' : 'down')
+    }, 1500)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  return floating
+}
+
+// Wrapper component for floating illustrations with smooth bobbing effect
+function FloatingIllustration({ children }: { children: React.ReactNode }) {
+  const floating = useFloatingAnimation()
+
+  return (
+    <FloatingContainer
+      floating={floating}
+      alignItems="center"
+      justifyContent="center"
+      animateOnly={['transform']}
+    >
+      {children}
+    </FloatingContainer>
+  )
+}
 
 interface OnboardingScreenProps {
   onComplete: () => void
@@ -30,99 +76,109 @@ const VAI_TEAL_LIGHTER = 'hsl(215, 83%, 65%)'
 // Custom illustration components for each slide
 function WelcomeIllustration() {
   return (
-    <YStack alignItems="center" justifyContent="center" padding="$4">
-      <img
-        src="./app-icon.png"
-        alt="VAI Studio"
-        style={{ width: 120, height: 120, borderRadius: 24 }}
-      />
-    </YStack>
+    <FloatingIllustration>
+      <YStack alignItems="center" justifyContent="center" padding="$4">
+        <img
+          src="./app-icon.png"
+          alt="VAI Studio"
+          style={{ width: 120, height: 120, borderRadius: 24 }}
+        />
+      </YStack>
+    </FloatingIllustration>
   )
 }
 
 function AudioFileIllustration() {
   return (
-    <YStack alignItems="center" justifyContent="center" padding="$4">
-      <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
-        <Path
-          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-          stroke={VAI_TEAL_LIGHT}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <Polyline
-          points="14,2 14,8 20,8"
-          stroke={VAI_TEAL_LIGHT}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <Rect x="7" y="12" width="1.5" height="4" rx={0.5} fill={VAI_TEAL_LIGHTER} />
-        <Rect x="10" y="10" width="1.5" height="8" rx={0.5} fill={VAI_TEAL_LIGHT} />
-        <Rect x="13" y="11" width="1.5" height="6" rx={0.5} fill={VAI_TEAL_LIGHTER} />
-        <Rect x="16" y="13" width="1.5" height="2" rx={0.5} fill={VAI_TEAL_LIGHT} />
-      </Svg>
-    </YStack>
+    <FloatingIllustration>
+      <YStack alignItems="center" justifyContent="center" padding="$4">
+        <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            stroke={VAI_TEAL_LIGHT}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <Polyline
+            points="14,2 14,8 20,8"
+            stroke={VAI_TEAL_LIGHT}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Rect x="7" y="12" width="1.5" height="4" rx={0.5} fill={VAI_TEAL_LIGHTER} />
+          <Rect x="10" y="10" width="1.5" height="8" rx={0.5} fill={VAI_TEAL_LIGHT} />
+          <Rect x="13" y="11" width="1.5" height="6" rx={0.5} fill={VAI_TEAL_LIGHTER} />
+          <Rect x="16" y="13" width="1.5" height="2" rx={0.5} fill={VAI_TEAL_LIGHT} />
+        </Svg>
+      </YStack>
+    </FloatingIllustration>
   )
 }
 
 function ModelsIllustration() {
   return (
-    <YStack alignItems="center" justifyContent="center" padding="$4">
-      <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
-        <Rect x="2" y="3" width="8" height="8" rx={2} stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} fill="none" />
-        <Rect x="14" y="3" width="8" height="8" rx={2} stroke={VAI_TEAL_LIGHTER} strokeWidth={1.5} fill="none" />
-        <Rect x="8" y="13" width="8" height="8" rx={2} stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} fill="none" />
-        <Polyline points="4,7 5.5,8.5 8,5.5" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        <Polyline points="16,7 17.5,8.5 20,5.5" stroke={VAI_TEAL_LIGHTER} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        <Polyline points="10,17 11.5,18.5 14,15.5" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-      </Svg>
-    </YStack>
+    <FloatingIllustration>
+      <YStack alignItems="center" justifyContent="center" padding="$4">
+        <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
+          <Rect x="2" y="3" width="8" height="8" rx={2} stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} fill="none" />
+          <Rect x="14" y="3" width="8" height="8" rx={2} stroke={VAI_TEAL_LIGHTER} strokeWidth={1.5} fill="none" />
+          <Rect x="8" y="13" width="8" height="8" rx={2} stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} fill="none" />
+          <Polyline points="4,7 5.5,8.5 8,5.5" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <Polyline points="16,7 17.5,8.5 20,5.5" stroke={VAI_TEAL_LIGHTER} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <Polyline points="10,17 11.5,18.5 14,15.5" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </YStack>
+    </FloatingIllustration>
   )
 }
 
 function CompareIllustration() {
   return (
-    <YStack alignItems="center" justifyContent="center" padding="$4">
-      <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
-        <Rect x="2" y="4" width="8" height="16" rx={2} stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} fill="none" />
-        <Rect x="14" y="4" width="8" height="16" rx={2} stroke={VAI_TEAL_LIGHTER} strokeWidth={1.5} fill="none" />
-        <Line x1="4" y1="8" x2="8" y2="8" stroke={VAI_TEAL_LIGHT} strokeWidth={1} strokeLinecap="round" />
-        <Line x1="4" y1="11" x2="8" y2="11" stroke={VAI_TEAL_LIGHT} strokeWidth={1} strokeLinecap="round" />
-        <Line x1="4" y1="14" x2="7" y2="14" stroke={VAI_TEAL_LIGHT} strokeWidth={1} strokeLinecap="round" />
-        <Line x1="16" y1="8" x2="20" y2="8" stroke={VAI_TEAL_LIGHTER} strokeWidth={1} strokeLinecap="round" />
-        <Line x1="16" y1="11" x2="20" y2="11" stroke={VAI_TEAL_LIGHTER} strokeWidth={1} strokeLinecap="round" />
-        <Line x1="16" y1="14" x2="19" y2="14" stroke={VAI_TEAL_LIGHTER} strokeWidth={1} strokeLinecap="round" />
-        <Line x1="10.5" y1="12" x2="13.5" y2="12" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" />
-        <Polyline points="12.5,10.5 13.5,12 12.5,13.5" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-      </Svg>
-    </YStack>
+    <FloatingIllustration>
+      <YStack alignItems="center" justifyContent="center" padding="$4">
+        <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
+          <Rect x="2" y="4" width="8" height="16" rx={2} stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} fill="none" />
+          <Rect x="14" y="4" width="8" height="16" rx={2} stroke={VAI_TEAL_LIGHTER} strokeWidth={1.5} fill="none" />
+          <Line x1="4" y1="8" x2="8" y2="8" stroke={VAI_TEAL_LIGHT} strokeWidth={1} strokeLinecap="round" />
+          <Line x1="4" y1="11" x2="8" y2="11" stroke={VAI_TEAL_LIGHT} strokeWidth={1} strokeLinecap="round" />
+          <Line x1="4" y1="14" x2="7" y2="14" stroke={VAI_TEAL_LIGHT} strokeWidth={1} strokeLinecap="round" />
+          <Line x1="16" y1="8" x2="20" y2="8" stroke={VAI_TEAL_LIGHTER} strokeWidth={1} strokeLinecap="round" />
+          <Line x1="16" y1="11" x2="20" y2="11" stroke={VAI_TEAL_LIGHTER} strokeWidth={1} strokeLinecap="round" />
+          <Line x1="16" y1="14" x2="19" y2="14" stroke={VAI_TEAL_LIGHTER} strokeWidth={1} strokeLinecap="round" />
+          <Line x1="10.5" y1="12" x2="13.5" y2="12" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" />
+          <Polyline points="12.5,10.5 13.5,12 12.5,13.5" stroke={VAI_TEAL_LIGHT} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </YStack>
+    </FloatingIllustration>
   )
 }
 
 function PrivacyIllustration() {
   return (
-    <YStack alignItems="center" justifyContent="center" padding="$4">
-      <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
-        <Path
-          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
-          stroke={VAI_TEAL_LIGHT}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <Polyline
-          points="9,12 11,14 15,10"
-          stroke={VAI_TEAL_LIGHTER}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
-    </YStack>
+    <FloatingIllustration>
+      <YStack alignItems="center" justifyContent="center" padding="$4">
+        <Svg width={120} height={120} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+            stroke={VAI_TEAL_LIGHT}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <Polyline
+            points="9,12 11,14 15,10"
+            stroke={VAI_TEAL_LIGHTER}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </YStack>
+    </FloatingIllustration>
   )
 }
 
@@ -261,9 +317,9 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       {/* Skip Button */}
       <XStack
         position="absolute"
-        top={0}
+        top={60}
         right={0}
-        padding="$4"
+        paddingRight="$4"
         zIndex={10}
       >
         <Button
@@ -271,7 +327,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           chromeless
           onPress={handleSkip}
         >
-          <Text color="$color9">Skip</Text>
+          <Text color="$color11" fontWeight="500" fontSize={16}>Skip</Text>
         </Button>
       </XStack>
 

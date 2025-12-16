@@ -347,16 +347,23 @@ export function ResultCard({
                 Segments ({result.segments.length})
               </Text>
               <YStack gap={4}>
-                {result.segments.slice(0, 10).map((segment) => (
-                  <XStack key={segment.id} gap={8} alignItems="flex-start">
-                    <Text fontSize={11} color="$secondary5" minWidth={60}>
-                      [{segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s]
-                    </Text>
-                    <Text fontSize={fontSizes.segment} color="$secondary9" flex={1}>
-                      {segment.text}
-                    </Text>
-                  </XStack>
-                ))}
+                {result.segments.slice(0, 10).map((segment, index) => {
+                  // Handle both Whisper native format (start/end) and transformers format (timestamp array)
+                  const start = segment.start ?? segment.timestamp?.[0] ?? 0
+                  const end = segment.end ?? segment.timestamp?.[1] ?? 0
+                  const segmentKey = segment.id ?? index
+
+                  return (
+                    <XStack key={segmentKey} gap={8} alignItems="flex-start">
+                      <Text fontSize={11} color="$secondary5" minWidth={60}>
+                        [{start.toFixed(1)}s - {end.toFixed(1)}s]
+                      </Text>
+                      <Text fontSize={fontSizes.segment} color="$secondary9" flex={1}>
+                        {segment.text}
+                      </Text>
+                    </XStack>
+                  )
+                })}
                 {result.segments.length > 10 && (
                   <Text fontSize={11} color="$secondary5" marginTop={4}>
                     ... and {result.segments.length - 10} more segments

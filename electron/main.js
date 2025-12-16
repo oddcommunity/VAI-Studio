@@ -25,6 +25,7 @@ const PDFDocument = require('pdfkit');
 const { getLogger } = require('./odd-core-integration');
 const { authService } = require('./auth-service');
 const { electronStorage, createElectronStorage } = require('../odd-core/packages/storage/dist/auth-storage/electron');
+const { createOnboardingOverlay, closeOnboardingOverlay, registerOverlayHandlers } = require('./onboarding-overlay');
 const logger = getLogger();
 
 // Initialize the Electron storage adapter for Supabase auth persistence
@@ -350,6 +351,19 @@ app.whenReady().then(async () => {
 
   createWindow();
 
+  // Register onboarding overlay IPC handlers
+  registerOverlayHandlers(mainWindow, store);
+
+  // Check if this is first run (onboarding not completed)
+  const settings = store.get('vai-studio-settings', {});
+  const isFirstRun = !settings.hasCompletedOnboarding;
+
+  if (isFirstRun) {
+    logger.info('First run detected - showing immersive onboarding overlay');
+    // Create the overlay (this will hide mainWindow)
+    createOnboardingOverlay(mainWindow);
+  }
+
   // Set up permission handler for media access (microphone, camera)
   // IMPORTANT: Grant permission in renderer, but let macOS handle the system-level permission
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -645,6 +659,11 @@ ipcMain.handle('clipboard-write', async (event, text) => {
     console.error('Clipboard write failed:', error);
     return false;
   }
+});
+
+// Get app version
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
 // List all available backends
@@ -944,7 +963,10 @@ ipcMain.handle('export-result', async (event, { result, format, filePath }) => {
 
               doc.fontSize(10).font('Helvetica');
               result.segments.forEach((seg) => {
-                const timestamp = `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s]`;
+                // Handle both Whisper native format (start/end) and transformers format (timestamp array)
+                const start = seg.start ?? seg.timestamp?.[0] ?? 0;
+                const end = seg.end ?? seg.timestamp?.[1] ?? 0;
+                const timestamp = `[${start.toFixed(1)}s - ${end.toFixed(1)}s]`;
                 doc.fillColor('#888888').text(timestamp, { continued: true });
                 doc.fillColor('#000000').text(` ${seg.text.trim()}`);
                 doc.moveDown(0.5);

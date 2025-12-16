@@ -278,6 +278,12 @@ export function App() {
     setShowLogin(false)
   }, [])
 
+  // Handle going back to onboarding from login
+  const handleBackToOnboarding = useCallback(() => {
+    updateSetting('hasCompletedOnboarding', false)
+    setShowLogin(false)
+  }, [updateSetting])
+
   // Handle profile update - use new data directly for instant UI update, then refresh cache
   const handleProfileUpdated = useCallback((data: { name?: string; avatarUrl?: string; phone?: string }) => {
     // Immediately update state with new data (no network delay)
@@ -338,6 +344,9 @@ export function App() {
           webProfileCache.clear(userId)
         }
 
+        // Reset onboarding so user sees it again on next sign in
+        updateSetting('hasCompletedOnboarding', false)
+
         setIsAuthenticated(false)
         setUserId(undefined)
         setUserEmail(undefined)
@@ -353,7 +362,7 @@ export function App() {
       console.error('[App] Sign out error:', error)
       showToast('Sign out failed', 'error', 3000)
     }
-  }, [showToast, userId])
+  }, [showToast, userId, updateSetting])
 
   // While checking auth status, show nothing (very brief)
   if (checkingAuth) {
@@ -389,6 +398,7 @@ export function App() {
             <DraggableHeader />
             <LoginScreen
               onLoginSuccess={handleLoginComplete}
+              onBack={handleBackToOnboarding}
             />
             {/* Toast Viewport */}
             <AppToastViewport />
@@ -408,6 +418,7 @@ export function App() {
             <DraggableHeader />
             <LoginScreen
               onLoginSuccess={handleLoginComplete}
+              onBack={handleBackToOnboarding}
             />
             {/* Toast Viewport */}
             <AppToastViewport />

@@ -11,6 +11,7 @@ import { authService } from '../services/auth.service'
 
 interface LoginScreenProps {
   onLoginSuccess: () => void
+  onBack?: () => void
 }
 
 // Logo illustration
@@ -26,7 +27,7 @@ function LogoIllustration() {
   )
 }
 
-export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, onBack }: LoginScreenProps) {
   const { showToast } = useToastStore()
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -61,7 +62,27 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       alignItems="center"
       justifyContent="center"
       padding="$6"
+      position="relative"
     >
+      {/* Back Button */}
+      {onBack && (
+        <XStack
+          position="absolute"
+          top={60}
+          left={0}
+          paddingLeft="$4"
+          zIndex={10}
+        >
+          <Button
+            size="$3"
+            chromeless
+            onPress={onBack}
+          >
+            <Text color="$color11" fontWeight="500" fontSize={16}>← Back</Text>
+          </Button>
+        </XStack>
+      )}
+
       <YStack
         width="100%"
         maxWidth={400}

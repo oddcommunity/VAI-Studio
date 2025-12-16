@@ -157,10 +157,12 @@ export interface TranscribeResult {
 }
 
 export interface TranscriptSegment {
-  id: number;
-  start: number;
-  end: number;
+  id?: number;
+  start?: number;
+  end?: number;
   text: string;
+  // Transformers pipeline format (used by quantized models)
+  timestamp?: [number, number];
 }
 
 // Batch Processing Types

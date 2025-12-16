@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import {
   YStack,
   XStack,
@@ -104,9 +104,18 @@ export function Sidebar({
   const [isMounted, setIsMounted] = useState(false)
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
   const [isCompareSelectorOpen, setIsCompareSelectorOpen] = useState(false)
+  const [appVersion, setAppVersion] = useState('1.0.0')
 
   useEffect(() => {
     setIsMounted(true)
+    // Fetch app version from Electron
+    if ((window as any).electronAPI?.getAppVersion) {
+      (window as any).electronAPI.getAppVersion().then((version: string) => {
+        setAppVersion(version)
+      }).catch(() => {
+        // Fallback to default version
+      })
+    }
   }, [])
 
   const handleModelChange = useCallback(
@@ -146,18 +155,28 @@ export function Sidebar({
             alt="VAI Studio"
             style={{ width: 28, height: 28, borderRadius: 6, display: 'block' }}
           />
-          <H2
-            margin={0}
-            padding={0}
-            lineHeight={28}
-            fontSize={24}
-            fontWeight="800"
-            fontFamily="$heading"
-            marginTop={5}
-            marginLeft={-2}
-          >
-            VAI Studio
-          </H2>
+          <XStack alignItems="baseline" gap={8}>
+            <H2
+              margin={0}
+              padding={0}
+              lineHeight={28}
+              fontSize={24}
+              fontWeight="800"
+              fontFamily="$heading"
+              marginTop={5}
+              marginLeft={-2}
+            >
+              VAI Studio
+            </H2>
+            <Text
+              fontSize={12}
+              fontWeight="500"
+              color="$color9"
+              fontFamily="$heading"
+            >
+              v{appVersion}
+            </Text>
+          </XStack>
         </XStack>
         <Text fontSize={15} color="$color" lineHeight={22}>
           Test and compare local speech-to-text models
