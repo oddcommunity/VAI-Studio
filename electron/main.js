@@ -1,5 +1,10 @@
-// Load environment variables from .env file
-require('dotenv').config();
+// Load environment variables from .env file (dev only)
+// In production, dotenv is not bundled - environment is configured at build time
+try {
+  require('dotenv').config();
+} catch (e) {
+  // dotenv not available in production build - this is expected
+}
 
 // Handle EPIPE errors at process level (broken pipe when stdout/stderr closes)
 // This prevents crashes during app shutdown when logger tries to write to closed streams
@@ -24,7 +29,7 @@ const PDFDocument = require('pdfkit');
 // Initialize Odd-Core services
 const { getLogger } = require('./odd-core-integration');
 const { authService } = require('./auth-service');
-const { electronStorage, createElectronStorage } = require('../odd-core/packages/storage/dist/auth-storage/electron');
+const { electronStorage, createElectronStorage } = require('@odd-core/storage/electron');
 const { createOnboardingOverlay, closeOnboardingOverlay, registerOverlayHandlers } = require('./onboarding-overlay');
 const logger = getLogger();
 
@@ -355,14 +360,13 @@ app.whenReady().then(async () => {
   registerOverlayHandlers(mainWindow, store);
 
   // Check if this is first run (onboarding not completed)
-  const settings = store.get('vai-studio-settings', {});
-  const isFirstRun = !settings.hasCompletedOnboarding;
-
-  if (isFirstRun) {
-    logger.info('First run detected - showing immersive onboarding overlay');
-    // Create the overlay (this will hide mainWindow)
-    createOnboardingOverlay(mainWindow);
-  }
+  // Note: Immersive onboarding overlay disabled - using normal in-app onboarding flow instead
+  // const settings = store.get('vai-studio-settings', {});
+  // const isFirstRun = !settings.hasCompletedOnboarding;
+  // if (isFirstRun) {
+  //   logger.info('First run detected - showing immersive onboarding overlay');
+  //   createOnboardingOverlay(mainWindow);
+  // }
 
   // Set up permission handler for media access (microphone, camera)
   // IMPORTANT: Grant permission in renderer, but let macOS handle the system-level permission
@@ -450,9 +454,16 @@ function runPythonCommand(args) {
     const envPath = process.env.PATH ? `${ffmpegPath}:${process.env.PATH}` : ffmpegPath;
 
     // PYTHONHOME is set by python-wrapper.sh
-    const spawnEnv = { ...process.env, PATH: envPath };
+    // Pass resources path so Python backends can find bundled models
+    const resourcesPath = app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');
+    const spawnEnv = {
+      ...process.env,
+      PATH: envPath,
+      VAI_RESOURCES_PATH: resourcesPath
+    };
 
     console.log('[Python] Running:', pythonPath, scriptPath, ...args);
+    console.log('[Python] Resources path:', resourcesPath);
 
     const pythonProcess = spawn(pythonPath, [scriptPath, ...args], {
       env: spawnEnv

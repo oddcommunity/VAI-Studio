@@ -26,8 +26,8 @@ function FeatureItem({ text }: FeatureItemProps) {
 }
 
 export function WelcomeScreen({
-  version = 'v3.0.1',
-  releaseDate = 'Nov 26, 2025',
+  version = 'v1.0.0',
+  releaseDate = 'Dec 17, 2025',
 }: WelcomeScreenProps) {
   const features = [
     'Test multiple Speech-To-Text models locally',

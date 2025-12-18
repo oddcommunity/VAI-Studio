@@ -35,23 +35,28 @@ export interface GroupedModelSelectorProps {
   onModelsChange?: (models: string[]) => void
 }
 
-// Map backend names to display names and providers
+// Note: Display names and providers are now passed directly via ModelGroup props
+// This mapping is only used as fallback for backwards compatibility
 const BACKEND_INFO: Record<string, { displayName: string; provider: string }> = {
-  whisper: { displayName: 'WHISPER', provider: 'OpenAI' },
-  'faster-whisper': { displayName: 'FASTER WHISPER', provider: 'Systran' },
-  'whisper.cpp': { displayName: 'WHISPER.CPP', provider: 'ggerganov' },
-  voxtral: { displayName: 'VOXTRAL', provider: 'Mistral AI' },
-  parakeet: { displayName: 'PARAKEET', provider: 'NVIDIA' },
-  granite: { displayName: 'GRANITE', provider: 'IBM' },
-  wav2vec_bert: { displayName: 'WAV2VEC_BERT', provider: 'Meta' },
-  canary: { displayName: 'CANARY', provider: 'NVIDIA' },
-  seamless: { displayName: 'SEAMLESS', provider: 'Meta' },
+  whisper: { displayName: 'OpenAI Whisper', provider: 'OpenAI' },
+  'faster-whisper': { displayName: 'Faster Whisper', provider: 'Systran' },
+  'whisper.cpp': { displayName: 'Whisper.cpp', provider: 'ggerganov' },
+  voxtral: { displayName: 'Mistral AI Voxtral', provider: 'Mistral AI' },
+  parakeet: { displayName: 'NVIDIA Parakeet', provider: 'NVIDIA' },
+  granite: { displayName: 'IBM Granite', provider: 'IBM' },
+  wav2vec_bert: { displayName: 'Meta - Wav2Vec-BERT', provider: 'Meta' },
+  canary: { displayName: 'NVIDIA Canary', provider: 'NVIDIA' },
+  seamless: { displayName: 'Meta - Seamless', provider: 'Meta' },
 }
 
-function getBackendInfo(backend: string): { displayName: string; provider: string } {
-  return BACKEND_INFO[backend.toLowerCase()] || {
-    displayName: backend.toUpperCase(),
-    provider: backend
+function getBackendInfo(group: ModelGroup): { displayName: string; provider: string } {
+  // Use the group's display info if provided, otherwise fall back to mapping
+  if (group.displayName && group.provider) {
+    return { displayName: group.displayName, provider: group.provider }
+  }
+  return BACKEND_INFO[group.backend.toLowerCase()] || {
+    displayName: group.backend.toUpperCase(),
+    provider: group.backend
   }
 }
 
@@ -99,7 +104,7 @@ export function GroupedModelSelector({
     const query = searchQuery.toLowerCase()
     return groups
       .map(group => {
-        const info = getBackendInfo(group.backend)
+        const info = getBackendInfo(group)
         const groupMatches =
           info.displayName.toLowerCase().includes(query) ||
           info.provider.toLowerCase().includes(query)
@@ -259,7 +264,7 @@ export function GroupedModelSelector({
       >
         <YStack paddingVertical={4}>
           {filteredGroups.map(group => {
-            const info = getBackendInfo(group.backend)
+            const info = getBackendInfo(group)
             const isExpanded = expandedGroups.has(group.backend)
 
             return (
@@ -288,13 +293,6 @@ export function GroupedModelSelector({
                       fontFamily="$body"
                     >
                       {info.displayName}
-                    </Text>
-                    <Text
-                      fontSize="$1"
-                      color="$color9"
-                      fontFamily="$body"
-                    >
-                      ({info.provider})
                     </Text>
                   </XStack>
                   <Text

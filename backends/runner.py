@@ -16,6 +16,7 @@ from voxtral_backend import VoxtralBackend
 from parakeet_backend import ParakeetBackend
 from granite_backend import GraniteBackend
 from wav2vec_bert_backend import Wav2VecBERTBackend
+from seamless_backend import SeamlessBackend
 
 
 # Registry of available backends
@@ -25,6 +26,7 @@ BACKENDS = {
     'parakeet': ParakeetBackend,
     'granite': GraniteBackend,
     'wav2vec_bert': Wav2VecBERTBackend,
+    'seamless': SeamlessBackend,
 }
 
 

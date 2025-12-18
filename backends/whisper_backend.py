@@ -109,12 +109,43 @@ class WhisperBackend(STTBackend):
         'turbo': ModelInfo('turbo', '809MB', '809M', '10-12%', ['transcription', 'translation'], 'OpenAI'),
     }
 
+    # Model filename mapping
+    MODEL_FILES = {
+        'tiny': 'tiny.pt',
+        'tiny.en': 'tiny.en.pt',
+        'base': 'base.pt',
+        'base.en': 'base.en.pt',
+        'small': 'small.pt',
+        'small.en': 'small.en.pt',
+        'medium': 'medium.pt',
+        'medium.en': 'medium.en.pt',
+        'large': 'large.pt',
+        'large-v1': 'large-v1.pt',
+        'large-v2': 'large-v2.pt',
+        'large-v3': 'large-v3.pt',
+        'turbo': 'large-v3-turbo.pt',
+    }
+
     def __init__(self):
         super().__init__()
         self._whisper = None
         self._current_model = None
         self._current_model_name = None
         self._url_patched = False
+
+    def _get_bundled_model_path(self, model_name: str) -> str:
+        """Get path to bundled model if it exists."""
+        resources_path = os.environ.get('VAI_RESOURCES_PATH', '')
+        if not resources_path:
+            return None
+        model_file = self.MODEL_FILES.get(model_name)
+        if not model_file:
+            return None
+        bundled_path = os.path.join(resources_path, 'models', 'whisper', model_file)
+        if os.path.exists(bundled_path):
+            print(f"[INFO] Found bundled model: {bundled_path}", file=sys.stderr)
+            return bundled_path
+        return None
 
     def _load_whisper(self):
         """Lazy load whisper module."""
@@ -179,14 +210,23 @@ class WhisperBackend(STTBackend):
                 whisper = self._load_whisper()
                 print(f"[INFO] Loading Whisper model: {model_name}...", file=sys.stderr)
 
-                # Check if model needs to be downloaded
-                if not self.is_model_installed(model_name):
+                # Check for bundled model first
+                bundled_path = self._get_bundled_model_path(model_name)
+                if bundled_path:
+                    # Load from bundled path - no download needed
+                    report_progress(26, f'Loading bundled {model_name} model...', 'loading')
+                    print(f"[INFO] Loading from bundled path: {bundled_path}", file=sys.stderr)
+                    self._current_model = whisper.load_model(bundled_path)
+                elif not self.is_model_installed(model_name):
                     # Download with live progress reporting
                     self._download_model_with_progress(model_name)
-
-                # Now load the model (will use cached file)
-                report_progress(26, f'Loading {model_name} model...', 'loading')
-                self._current_model = whisper.load_model(model_name)
+                    # Now load the model (will use cached file)
+                    report_progress(26, f'Loading {model_name} model...', 'loading')
+                    self._current_model = whisper.load_model(model_name)
+                else:
+                    # Load from cache
+                    report_progress(26, f'Loading {model_name} model...', 'loading')
+                    self._current_model = whisper.load_model(model_name)
             self._current_model_name = model_name
         return self._current_model
 
@@ -207,24 +247,8 @@ class WhisperBackend(STTBackend):
         cache_dir = os.path.expanduser('~/.cache/whisper')
         os.makedirs(cache_dir, exist_ok=True)
 
-        # Model file naming
-        model_files = {
-            'tiny': 'tiny.pt',
-            'tiny.en': 'tiny.en.pt',
-            'base': 'base.pt',
-            'base.en': 'base.en.pt',
-            'small': 'small.pt',
-            'small.en': 'small.en.pt',
-            'medium': 'medium.pt',
-            'medium.en': 'medium.en.pt',
-            'large': 'large.pt',
-            'large-v1': 'large-v1.pt',
-            'large-v2': 'large-v2.pt',
-            'large-v3': 'large-v3.pt',
-            'turbo': 'large-v3-turbo.pt',
-        }
-
-        model_file = model_files.get(model_name, f'{model_name}.pt')
+        # Use class constant for model file naming
+        model_file = self.MODEL_FILES.get(model_name, f'{model_name}.pt')
         dest_path = os.path.join(cache_dir, model_file)
 
         print(f"[INFO] Downloading {model_name} (CDN with blob fallback)...", file=sys.stderr)
@@ -338,9 +362,13 @@ class WhisperBackend(STTBackend):
     def is_model_installed(self, model_name: str) -> bool:
         """
         Check if a Whisper model is installed.
-        Whisper models are stored in ~/.cache/whisper/
-        HuggingFace models (quantized) are stored in ~/.cache/huggingface/hub/
+        Checks in order: bundled models, ~/.cache/whisper/, ~/.cache/huggingface/hub/
         """
+        # Check for bundled model first
+        bundled_path = self._get_bundled_model_path(model_name)
+        if bundled_path:
+            return True
+
         # Check for RedHat quantized model in HuggingFace cache
         if model_name == 'large-v3-quantized-w4a16':
             hf_cache_dir = os.path.expanduser('~/.cache/huggingface/hub')
@@ -351,29 +379,12 @@ class WhisperBackend(STTBackend):
             model_path = os.path.join(hf_cache_dir, model_dir_name)
             return os.path.exists(model_path)
 
-        # Check for native Whisper models
+        # Check for native Whisper models in cache
         cache_dir = os.path.expanduser('~/.cache/whisper')
         if not os.path.exists(cache_dir):
             return False
 
-        # Check for model file
-        model_files = {
-            'tiny': 'tiny.pt',
-            'tiny.en': 'tiny.en.pt',
-            'base': 'base.pt',
-            'base.en': 'base.en.pt',
-            'small': 'small.pt',
-            'small.en': 'small.en.pt',
-            'medium': 'medium.pt',
-            'medium.en': 'medium.en.pt',
-            'large': 'large.pt',
-            'large-v1': 'large-v1.pt',
-            'large-v2': 'large-v2.pt',
-            'large-v3': 'large-v3.pt',
-            'turbo': 'large-v3-turbo.pt',
-        }
-
-        model_file = model_files.get(model_name, f'{model_name}.pt')
+        model_file = self.MODEL_FILES.get(model_name, f'{model_name}.pt')
         model_path = os.path.join(cache_dir, model_file)
 
         return os.path.exists(model_path)

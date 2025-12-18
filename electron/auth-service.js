@@ -13,7 +13,7 @@
 const { AuthManager, parseAuthCallbackUrl } = require('@odd-core/auth');
 const { createClient } = require('@supabase/supabase-js');
 const { getLogger } = require('./odd-core-integration');
-const { electronStorage } = require('../odd-core/packages/storage/dist/auth-storage/electron');
+const { electronStorage } = require('@odd-core/storage/electron');
 const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
 const logger = getLogger();

@@ -95,7 +95,7 @@ export function LoginScreen({ onLoginSuccess, onBack }: LoginScreenProps) {
           <H1 textAlign="center">VAI Studio</H1>
           <H2 textAlign="center">by Odd.Community</H2>
           <Text fontSize={16} color="$color11" textAlign="center">
-            Join the community for free access VAI Studio
+            Join the community for FREE access to VAI Studio
           </Text>
         </YStack>
 

@@ -52,9 +52,14 @@ echo "Cleaning up unnecessary files..."
 find "$BUNDLE_DIR/venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find "$BUNDLE_DIR/venv" -type f -name "*.pyc" -delete 2>/dev/null || true
 find "$BUNDLE_DIR/venv" -type f -name "*.pyo" -delete 2>/dev/null || true
-find "$BUNDLE_DIR/venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+# NOTE: DO NOT delete dist-info directories - they are required for package metadata
+# find "$BUNDLE_DIR/venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
 find "$BUNDLE_DIR/venv" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 find "$BUNDLE_DIR/venv" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+
+# Bundle get-pip.py for emergency repairs
+echo "Bundling get-pip.py..."
+curl -sS https://bootstrap.pypa.io/get-pip.py -o "$BUNDLE_DIR/get-pip.py"
 
 # Remove files that cause code signing issues on macOS
 # Static libraries (.a) cannot be properly code signed

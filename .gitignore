@@ -72,3 +72,5 @@ temp/
 # Generated build info (auto-generated at build time)
 src/build-info.json
 dist-react
+dist-electron/
+.build-bin/

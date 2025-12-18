@@ -20,50 +20,70 @@ fi
 echo "Processing venv: $VENV_DIR"
 echo ""
 
-# Find all .so files (native extensions)
-echo "Finding .so files to sign..."
-SO_FILES=$(find "$VENV_DIR" -name "*.so" -type f)
-SO_COUNT=$(echo "$SO_FILES" | grep -c "\.so" || echo "0")
+# Find all native binary files (.so and .dylib)
+echo "Finding native binaries to sign (.so, .dylib)..."
+BINARY_FILES=$(find "$VENV_DIR" -type f \( -name "*.so" -o -name "*.dylib" \))
+BINARY_COUNT=$(echo "$BINARY_FILES" | grep -c -E '\.(so|dylib)' || echo "0")
 
-echo "Found $SO_COUNT .so files"
+echo "Found $BINARY_COUNT native binaries"
 echo ""
 
-if [ "$SO_COUNT" -eq 0 ]; then
-  echo "No .so files found, skipping..."
+if [ "$BINARY_COUNT" -eq 0 ]; then
+  echo "No native binaries found, skipping..."
   exit 0
 fi
 
-# Sign each .so file with ad-hoc signature (no developer certificate needed)
-echo "Signing .so files with ad-hoc signature..."
+# Determine signing identity
+# Use Developer ID if available, otherwise fall back to ad-hoc
+SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "-")
+
+# Get entitlements path
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENTITLEMENTS="$PROJECT_ROOT/build/entitlements.mac.plist"
+
+if [ "$SIGN_IDENTITY" = "-" ] || [ -z "$SIGN_IDENTITY" ]; then
+  echo "No Developer ID found, using ad-hoc signature..."
+  SIGN_IDENTITY="-"
+  SIGN_FLAGS="--timestamp=none"
+else
+  echo "Using: $SIGN_IDENTITY"
+  # Use hardened runtime and entitlements for distribution
+  if [ -f "$ENTITLEMENTS" ]; then
+    SIGN_FLAGS="--timestamp --options runtime --entitlements $ENTITLEMENTS"
+  else
+    SIGN_FLAGS="--timestamp --options runtime"
+  fi
+fi
+
+echo "Signing native binaries..."
 SIGNED_COUNT=0
 
-while IFS= read -r so_file; do
-  if [ -n "$so_file" ]; then
-    # Use ad-hoc signature (-) for unsigned builds
-    # For production, replace with: codesign --force --sign "Developer ID Application: YourName" ...
-    codesign --force --sign - --timestamp=none "$so_file" 2>/dev/null || {
-      echo "  ⚠ Warning: Failed to sign $(basename "$so_file")"
+while IFS= read -r binary_file; do
+  if [ -n "$binary_file" ]; then
+    codesign --force --sign "$SIGN_IDENTITY" $SIGN_FLAGS "$binary_file" 2>/dev/null || {
+      echo "  ⚠ Warning: Failed to sign $(basename "$binary_file")"
       continue
     }
     SIGNED_COUNT=$((SIGNED_COUNT + 1))
 
     # Show progress every 10 files
     if [ $((SIGNED_COUNT % 10)) -eq 0 ]; then
-      echo "  Signed $SIGNED_COUNT/$SO_COUNT files..."
+      echo "  Signed $SIGNED_COUNT/$BINARY_COUNT files..."
     fi
   fi
-done <<< "$SO_FILES"
+done <<< "$BINARY_FILES"
 
 echo ""
-echo "✓ Signed $SIGNED_COUNT/$SO_COUNT .so files successfully"
+echo "✓ Signed $SIGNED_COUNT/$BINARY_COUNT native binaries successfully"
 echo ""
 
 # Verify a few signatures
 echo "Verifying signatures on sample files..."
-SAMPLE_FILES=$(echo "$SO_FILES" | head -3)
-while IFS= read -r so_file; do
-  if [ -n "$so_file" ]; then
-    codesign --verify --verbose "$so_file" 2>&1 | head -1 || true
+SAMPLE_FILES=$(echo "$BINARY_FILES" | head -3)
+while IFS= read -r binary_file; do
+  if [ -n "$binary_file" ]; then
+    echo "  $(basename "$binary_file"):"
+    codesign --verify --verbose "$binary_file" 2>&1 | grep -E "(valid|runtime)" || true
   fi
 done <<< "$SAMPLE_FILES"
 

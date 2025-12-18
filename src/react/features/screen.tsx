@@ -111,21 +111,112 @@ export function VAIStudioFeatureScreen({
     return modelList
   }, [backends])
 
-  // Convert backends to grouped model list for UI
+  // Helper to parse size strings like "39MB", "1.5GB", "~4GB" into bytes for sorting
+  const parseSizeToBytes = (sizeStr: string): number => {
+    const cleaned = sizeStr.replace(/[~<>]/g, '').trim()
+    const match = cleaned.match(/^([\d.]+)\s*(MB|GB|TB|B|KB)?$/i)
+    if (!match) return 0
+    const value = parseFloat(match[1])
+    const unit = (match[2] || 'MB').toUpperCase()
+    const multipliers: Record<string, number> = {
+      B: 1,
+      KB: 1024,
+      MB: 1024 * 1024,
+      GB: 1024 * 1024 * 1024,
+      TB: 1024 * 1024 * 1024 * 1024,
+    }
+    return value * (multipliers[unit] || 1024 * 1024)
+  }
+
+  // Fixed display order and naming for model groups
+  const GROUP_CONFIG: Record<string, { order: number; displayName: string; provider: string }> = {
+    'whisper:OpenAI': { order: 1, displayName: '(OpenAI) Whisper', provider: 'OpenAI' },
+    'whisper:RedHat AI': { order: 2, displayName: '(RedHat AI) Quantized Whisper', provider: 'RedHat AI' },
+    'wav2vec_bert': { order: 3, displayName: '(Meta) Wav2Vec-BERT', provider: 'Meta' },
+    'seamless': { order: 4, displayName: '(Meta) Seamless', provider: 'Meta' },
+    'parakeet': { order: 5, displayName: '(NVIDIA) Parakeet', provider: 'NVIDIA' },
+    'granite': { order: 6, displayName: '(IBM) Granite', provider: 'IBM' },
+    'voxtral': { order: 7, displayName: '(Mistral AI) Voxtral', provider: 'Mistral AI' },
+  }
+
+  // Convert backends to grouped model list for UI (with exact order and naming)
   const modelGroups = useMemo((): ModelGroup[] => {
-    return Object.entries(backends)
+    const groups: (ModelGroup & { _order: number })[] = []
+
+    Object.entries(backends)
       .filter(([_, backend]) => backend.available)
-      .map(([backendName, backend]) => ({
-        backend: backendName,
-        displayName: backendName.toUpperCase(),
-        provider: backendName,
-        models: backend.models.map((model) => ({
-          id: JSON.stringify({ backend: backendName, model: model.name }),
-          name: model.name,
-          size: model.size,
-          installed: model.installed,
-        })),
-      }))
+      .forEach(([backendName, backend]) => {
+        // Special handling for whisper: split by provider (OpenAI vs RedHat AI)
+        if (backendName === 'whisper') {
+          const openaiModels = backend.models.filter(m => m.provider === 'OpenAI' || !m.provider)
+          const redhatModels = backend.models.filter(m => m.provider === 'RedHat AI')
+
+          if (openaiModels.length > 0) {
+            const config = GROUP_CONFIG['whisper:OpenAI']
+            const sortedModels = [...openaiModels]
+              .sort((a, b) => parseSizeToBytes(a.size) - parseSizeToBytes(b.size))
+              .map((model) => ({
+                id: JSON.stringify({ backend: backendName, model: model.name }),
+                name: model.name,
+                size: model.size,
+                installed: model.installed,
+              }))
+            groups.push({
+              backend: backendName,
+              displayName: config.displayName,
+              provider: config.provider,
+              models: sortedModels,
+              _order: config.order,
+            })
+          }
+
+          if (redhatModels.length > 0) {
+            const config = GROUP_CONFIG['whisper:RedHat AI']
+            const sortedModels = [...redhatModels]
+              .sort((a, b) => parseSizeToBytes(a.size) - parseSizeToBytes(b.size))
+              .map((model) => ({
+                id: JSON.stringify({ backend: backendName, model: model.name }),
+                name: model.name,
+                size: model.size,
+                installed: model.installed,
+              }))
+            groups.push({
+              backend: backendName,
+              displayName: config.displayName,
+              provider: config.provider,
+              models: sortedModels,
+              _order: config.order,
+            })
+          }
+        } else {
+          // Standard backend handling
+          const config = GROUP_CONFIG[backendName] || {
+            order: 99,
+            displayName: backendName.toUpperCase(),
+            provider: backendName,
+          }
+          const sortedModels = [...backend.models]
+            .sort((a, b) => parseSizeToBytes(a.size) - parseSizeToBytes(b.size))
+            .map((model) => ({
+              id: JSON.stringify({ backend: backendName, model: model.name }),
+              name: model.name,
+              size: model.size,
+              installed: model.installed,
+            }))
+          groups.push({
+            backend: backendName,
+            displayName: config.displayName,
+            provider: config.provider,
+            models: sortedModels,
+            _order: config.order,
+          })
+        }
+      })
+
+    // Sort by fixed order and remove temporary field
+    return groups
+      .sort((a, b) => a._order - b._order)
+      .map(({ _order, ...group }) => group)
   }, [backends])
 
   // File selection handler
@@ -393,8 +484,8 @@ export function VAIStudioFeatureScreen({
       compareMode={comparisonMode}
       onCompareModeChange={setComparisonMode}
       isTranscribing={isTranscribing}
-      version="v3.0.1"
-      releaseDate="Nov 26, 2025"
+      version="v1.0.0"
+      releaseDate="Dec 17, 2025"
       selectedFile={selectedFile ?? undefined}
       onClearFile={() => setSelectedFile(null)}
       batchFiles={batchFiles}
@@ -418,7 +509,7 @@ export function VAIStudioFeatureScreen({
           selectedFile={selectedFile ?? undefined}
         />
       ) : (
-        <WelcomeScreen version="v3.0.1" releaseDate="Nov 26, 2025" />
+        <WelcomeScreen version="v1.0.0" releaseDate="Dec 17, 2025" />
       )}
     </VAIStudioScreen>
   )
