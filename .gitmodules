@@ -7,3 +7,4 @@
 [submodule "exe-doc"]
 	path = exe-doc
 	url = https://github.com/oddcommunity/exe-doc.git
+	branch = vai-studio
