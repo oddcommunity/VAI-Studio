@@ -1,11 +1,18 @@
 /**
- * afterPack Hook - Pre-sign Python binaries
+ * afterPack Hook - Validation and Pre-signing
  *
  * This hook runs after electron-builder packs the app but before code signing.
- * It pre-signs all Python native binaries (.so, .dylib) to prevent timeout
- * issues during the main signing phase.
+ * It performs two critical steps:
  *
- * Why this is needed:
+ * STEP 1: PRE-SIGN VALIDATION GATE
+ * - Validates app structure (required files exist)
+ * - Validates bundled dependencies (node_modules)
+ * - Validates bundle integrity (size, content checks)
+ * - ABORTS build if any validation fails (saves 10-20 min of signing time)
+ *
+ * STEP 2: PYTHON BINARY PRE-SIGNING
+ * - Pre-signs all Python native binaries (.so, .dylib)
+ * - Prevents timeout issues during main signing phase
  * - The Python venv contains 444+ native binaries
  * - Signing 22K+ files can cause exit code 144 (timeout)
  * - Pre-signing critical binaries reduces load on main signing step
@@ -33,6 +40,29 @@ exports.default = async function afterPack(context) {
 
   const appName = context.packager.appInfo.productFilename;
   const appPath = path.join(appOutDir, `${appName}.app`);
+
+  // ========================================
+  // STEP 1: PRE-SIGN VALIDATION GATE
+  // ========================================
+  console.log('\n========================================');
+  console.log('Running pre-sign validation checks...');
+  console.log('========================================\n');
+
+  try {
+    const preSignCheckScript = path.join(__dirname, 'pre-sign-check.js');
+    execSync(`node "${preSignCheckScript}" "${appPath}"`, {
+      encoding: 'utf8',
+      stdio: 'inherit'
+    });
+  } catch (error) {
+    console.error('\n❌ Pre-sign validation failed!');
+    console.error('Aborting build to prevent signing broken artifacts.\n');
+    process.exit(1);
+  }
+
+  // ========================================
+  // STEP 2: PYTHON BINARY PRE-SIGNING
+  // ========================================
   const pythonVenvPath = path.join(appPath, 'Contents/Resources/backends/venv');
 
   // Check if Python venv exists

@@ -27,7 +27,6 @@ const externalModules = [
   'electron-updater',
   'ffmpeg-static',
   'pdfkit',
-  'keytar',
   // Workspace packages (symlinked, must be copied not bundled)
   '@odd-core/api',
   '@odd-core/auth',
@@ -181,6 +180,88 @@ function checkPreload() {
   return !hasErrors;
 }
 
+function checkTransitiveDependencies(nodeModulesPath) {
+  console.log('\n' + '='.repeat(60));
+  console.log('Checking transitive dependencies...\n');
+
+  if (!fs.existsSync(nodeModulesPath)) {
+    console.error(`ERROR: ${nodeModulesPath} not found`);
+    console.error('Run ./scripts/bundle-electron.sh first\n');
+    return false;
+  }
+
+  // Only check transitive deps for non-workspace external modules
+  const packagesToCheck = externalModules.filter(pkg => !pkg.startsWith('@odd'));
+
+  console.log(`Checking transitive dependencies for: ${packagesToCheck.join(', ')}\n`);
+
+  let hasErrors = false;
+  const allModulesToSkip = [...builtinModules, ...electronModules];
+
+  for (const packageName of packagesToCheck) {
+    const packagePath = path.join(nodeModulesPath, packageName);
+
+    if (!fs.existsSync(packagePath)) {
+      console.log(`  ⚠ ${packageName} not found in node_modules (skipping transitive check)`);
+      continue;
+    }
+
+    const packageJsonPath = path.join(packagePath, 'package.json');
+
+    if (!fs.existsSync(packageJsonPath)) {
+      console.log(`  ⚠ ${packageName}/package.json not found (skipping)`);
+      continue;
+    }
+
+    let packageJson;
+    try {
+      packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    } catch (err) {
+      console.log(`  ⚠ Failed to parse ${packageName}/package.json: ${err.message}`);
+      continue;
+    }
+
+    const dependencies = packageJson.dependencies || {};
+    const depNames = Object.keys(dependencies);
+
+    if (depNames.length === 0) {
+      console.log(`  ✓ ${packageName} (no transitive dependencies)`);
+      continue;
+    }
+
+    console.log(`  ${packageName}:`);
+
+    for (const depName of depNames.sort()) {
+      // Skip built-in modules and Electron modules
+      if (allModulesToSkip.includes(depName)) {
+        console.log(`    ✓ ${packageName} → ${depName} (built-in/electron)`);
+        continue;
+      }
+
+      // Check if transitive dependency exists
+      const depPath = path.join(nodeModulesPath, depName);
+
+      if (fs.existsSync(depPath)) {
+        console.log(`    ✓ ${packageName} → ${depName}`);
+      } else {
+        console.log(`    ✗ ${packageName} → ${depName} (MISSING)`);
+        hasErrors = true;
+      }
+    }
+
+    console.log('');
+  }
+
+  if (hasErrors) {
+    console.log('❌ Transitive dependency check FAILED\n');
+    console.log('Fix: Update esbuild.config.js or run npm install in dist-electron/\n');
+  } else {
+    console.log('✓ All transitive dependencies present\n');
+  }
+
+  return !hasErrors;
+}
+
 function main() {
   console.log('='.repeat(60));
   console.log('Dependency Checker for Bundled Electron Main Process');
@@ -190,9 +271,12 @@ function main() {
   const mainOk = checkBundledFile();
   const preloadOk = checkPreload();
 
+  const nodeModulesPath = path.join(__dirname, '../dist-electron/node_modules');
+  const transitiveOk = checkTransitiveDependencies(nodeModulesPath);
+
   console.log('\n' + '='.repeat(60));
 
-  if (mainOk && preloadOk) {
+  if (mainOk && preloadOk && transitiveOk) {
     console.log('✓ All dependencies are accounted for');
     console.log('='.repeat(60));
     process.exit(0);
@@ -207,4 +291,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { extractRequires, checkBundledFile, checkPreload };
+module.exports = { extractRequires, checkBundledFile, checkPreload, checkTransitiveDependencies };

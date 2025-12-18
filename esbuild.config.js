@@ -8,11 +8,11 @@
 const esbuild = require('esbuild');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 // Native modules that must be externalized (cannot be bundled)
 const nativeModules = [
   'electron',
-  'keytar', // Native module for secure storage
   'fsevents', // macOS file watching (native)
 ];
 
@@ -26,16 +26,8 @@ const externalModules = [
   'ffmpeg-static',
   // PDFKit has complex asset loading
   'pdfkit',
-  // Workspace packages (symlinked, must be copied not bundled)
-  '@odd-core/api',
-  '@odd-core/auth',
-  '@odd-core/log',
-  '@odd-core/storage',
-  '@odd-core/types',
-  '@odd-core/ui',
-  '@odd-design-system/design-tokens',
-  '@odd-design-system/icons',
-  '@odd-design-system/ui-components',
+  // Workspace packages are now bundled directly (no longer externalized)
+  // This reduces external dependencies from 13 to 4
 ];
 
 /**
@@ -63,7 +55,12 @@ async function bundleMain() {
       logLevel: 'info',
       // Handle resolve issues gracefully
       mainFields: ['module', 'main'],
-      resolveExtensions: ['.js', '.json', '.node'],
+      resolveExtensions: ['.ts', '.tsx', '.js', '.jsx', '.json', '.node'],
+      // Loaders for TypeScript files from workspace packages
+      loader: {
+        '.ts': 'ts',
+        '.tsx': 'tsx'
+      },
       // Preserve symlinks for workspace packages
       preserveSymlinks: false,
     });
@@ -153,66 +150,25 @@ async function bundleOverlays() {
 
 /**
  * Copy external modules that need to be in node_modules
+ *
+ * Uses the Smart Dependency Copier script to recursively copy
+ * all external modules and their transitive dependencies.
  */
 async function copyExternalModules() {
-  console.log('\nCopying external modules...');
+  console.log('\nCopying external modules with dependencies...');
 
-  const modulesToCopy = externalModules.filter(m => m !== 'electron' && m !== 'fsevents');
+  try {
+    const scriptPath = path.join(__dirname, 'scripts', 'copy-dependencies.js');
 
-  for (const moduleName of modulesToCopy) {
-    // Handle scoped packages (@scope/package)
-    const srcDir = path.join('node_modules', moduleName);
-    const destDir = path.join('dist-electron/node_modules', moduleName);
-
-    // Resolve symlinks for workspace packages
-    let actualSrcDir = srcDir;
-    try {
-      const stats = fs.lstatSync(srcDir);
-      if (stats.isSymbolicLink()) {
-        actualSrcDir = fs.realpathSync(srcDir);
-        console.log(`  ${moduleName} is symlinked to ${actualSrcDir}`);
-      }
-    } catch (err) {
-      console.warn(`  Warning: Could not read ${moduleName} - ${err.message}`);
-      continue;
-    }
-
-    if (fs.existsSync(actualSrcDir)) {
-      console.log(`  Copying ${moduleName}...`);
-
-      // Create destination directory (handles scoped packages like @odd-core/auth)
-      fs.mkdirSync(path.dirname(destDir), { recursive: true });
-
-      // Copy the module (simple recursive copy)
-      copyRecursiveSync(actualSrcDir, destDir);
-    } else {
-      console.warn(`  Warning: ${moduleName} not found at ${actualSrcDir}`);
-    }
-  }
-
-  console.log('✓ External modules copied');
-}
-
-/**
- * Recursive copy helper
- */
-function copyRecursiveSync(src, dest) {
-  const exists = fs.existsSync(src);
-  const stats = exists && fs.statSync(src);
-  const isDirectory = exists && stats.isDirectory();
-
-  if (isDirectory) {
-    if (!fs.existsSync(dest)) {
-      fs.mkdirSync(dest, { recursive: true });
-    }
-    fs.readdirSync(src).forEach(childItemName => {
-      copyRecursiveSync(
-        path.join(src, childItemName),
-        path.join(dest, childItemName)
-      );
+    // Run the Smart Dependency Copier script
+    execSync(`node "${scriptPath}"`, {
+      cwd: __dirname,
+      stdio: 'inherit', // Show script output in real-time
     });
-  } else {
-    fs.copyFileSync(src, dest);
+
+  } catch (error) {
+    console.error('✗ Failed to copy external modules:', error.message);
+    throw error;
   }
 }
 

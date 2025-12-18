@@ -11,13 +11,17 @@
     "preview": "vite preview",
     "bundle:electron": "./scripts/bundle-electron.sh",
     "check:deps": "node scripts/check-dependencies.js",
+    "copy:deps": "node scripts/copy-dependencies.js",
     "prebuild": "./scripts/generate-build-info.sh && ./scripts/prepare-python-bundle.sh && npm run bundle:electron && npm run check:deps",
     "build": "npm run build:react && npm run prebuild && electron-builder",
     "build:mac": "npm run build:react && npm run prebuild && electron-builder --mac",
+    "build:mac:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac",
     "build:win": "npm run build:react && npm run prebuild && electron-builder --win",
     "build:linux": "npm run build:react && npm run prebuild && electron-builder --linux",
     "build:all": "npm run build:react && npm run prebuild && electron-builder --mac --win --linux",
-    "smoke-test": "./scripts/smoke-test.sh"
+    "smoke-test": "./scripts/smoke-test.sh",
+    "clean": "rm -rf dist dist-electron dist-react node_modules/.cache",
+    "clean:all": "rm -rf dist dist-electron dist-react node_modules"
   },
   "keywords": [
     "speech-to-text",

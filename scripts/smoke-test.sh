@@ -1,21 +1,12 @@
 #!/bin/bash
 set -e
 
-# Smoke test script for VAI Studio
-# Builds an unsigned app and launches it to check for immediate crashes
-# This catches runtime issues BEFORE spending time on code signing and notarization
+# Comprehensive smoke test for VAI Studio
+# Validates bundle integrity before production builds
 
 echo "=================================================="
-echo "VAI Studio Smoke Test"
+echo "VAI Studio Comprehensive Smoke Test"
 echo "=================================================="
-echo ""
-echo "This script will:"
-echo "  1. Build React frontend"
-echo "  2. Bundle Electron main process"
-echo "  3. Check dependencies"
-echo "  4. Build unsigned macOS app"
-echo "  5. Launch the app for 10 seconds"
-echo "  6. Check for crashes"
 echo ""
 
 # Colors for output
@@ -24,125 +15,188 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Step 1: Build React frontend
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 1/6: Building React frontend"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-pnpm run build:react
+# Track pass/fail
+TESTS_PASSED=0
+TESTS_FAILED=0
 
-# Step 2: Bundle Electron main process
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 2/6: Bundling Electron main process"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-./scripts/bundle-electron.sh
+# Helper function for test results
+pass() {
+    echo -e "${GREEN}✓${NC} $1"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+}
 
-# Step 3: Check dependencies
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 3/6: Checking bundled dependencies"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-node scripts/check-dependencies.js
-
-# Step 4: Run prebuild tasks
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 4/6: Running prebuild tasks"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-./scripts/generate-build-info.sh
-./scripts/prepare-python-bundle.sh
-
-# Step 5: Build unsigned app
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 5/6: Building unsigned macOS app"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Note: Disabling code signing for smoke test"
-CSC_IDENTITY_AUTO_DISCOVERY=false pnpm run build:mac
-
-# Check if build succeeded
-if [ ! -d "dist/mac-arm64/VAI Studio.app" ]; then
-    echo -e "${RED}✗ Build failed - app not found${NC}"
+fail() {
+    echo -e "${RED}✗${NC} $1"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
     exit 1
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 1/8: Check bundle exists"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ ! -f "dist-electron/main.js" ]; then
+    fail "dist-electron/main.js not found"
 fi
 
-echo -e "${GREEN}✓ Build successful${NC}"
-
-# Step 6: Launch and monitor
+BUNDLE_SIZE=$(du -h dist-electron/main.js | awk '{print $1}')
+pass "Bundle exists (size: $BUNDLE_SIZE)"
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 6/6: Launching app for smoke test"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 2/8: Check external modules"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-APP_PATH="dist/mac-arm64/VAI Studio.app"
+EXTERNAL_MODULES=(
+    "electron-store"
+    "electron-updater"
+    "ffmpeg-static"
+    "pdfkit"
+)
+
+for module in "${EXTERNAL_MODULES[@]}"; do
+    if [ ! -d "dist-electron/node_modules/$module" ]; then
+        fail "$module not found in dist-electron/node_modules"
+    fi
+    pass "$module found"
+done
+echo ""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 3/8: Check transitive dependencies"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# conf is a dependency of electron-store
+if [ ! -d "dist-electron/node_modules/conf" ]; then
+    fail "conf (electron-store dependency) not found"
+fi
+pass "conf found"
+echo ""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 4/8: Run dependency checker"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if ! node scripts/check-dependencies.js; then
+    fail "Dependency checker failed"
+fi
+pass "All dependencies validated"
+echo ""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 5/8: Check bundle syntax"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if ! node --check dist-electron/main.js; then
+    fail "Bundle contains syntax errors"
+fi
+pass "Bundle syntax valid"
+echo ""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 6/8: Test module resolution"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Try to require the bundle - expect electron-related errors only
+# Any other errors indicate module resolution issues
+TEST_OUTPUT=$(cd dist-electron && node -e "try { require('./main.js'); } catch(e) { console.log(e.message); }" 2>&1)
+
+if echo "$TEST_OUTPUT" | grep -qi "electron"; then
+    pass "Module resolution OK (expected electron error)"
+elif [ -z "$TEST_OUTPUT" ]; then
+    pass "Module resolution OK"
+else
+    echo "Unexpected error: $TEST_OUTPUT"
+    fail "Module resolution failed"
+fi
+echo ""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 7/8: Build unsigned app"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Note: Disabling code signing for smoke test"
+echo ""
+
+if ! CSC_IDENTITY_AUTO_DISCOVERY=false pnpm run build:mac; then
+    fail "App build failed"
+fi
+
+# Check for app in both possible locations
+APP_PATH=""
+if [ -d "dist/mac-arm64/VAI Studio.app" ]; then
+    APP_PATH="dist/mac-arm64/VAI Studio.app"
+elif [ -d "dist/mac/VAI Studio.app" ]; then
+    APP_PATH="dist/mac/VAI Studio.app"
+else
+    fail "Built app not found in dist/"
+fi
+
+pass "App built successfully at $APP_PATH"
+echo ""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo "Step 8/8: Launch app test"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Launch the app in background
 echo "Launching VAI Studio..."
 open "$APP_PATH" &
-APP_PID=$!
+LAUNCH_PID=$!
 
 # Wait for app to start
 echo "Waiting 3 seconds for app to launch..."
 sleep 3
 
-# Check if app is running
-if ps -p $APP_PID > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ App launched successfully${NC}"
-else
-    echo -e "${RED}✗ App crashed on launch${NC}"
-    echo ""
-    echo "Checking for crash logs..."
-    CRASH_LOG=$(ls -t ~/Library/Logs/DiagnosticReports/VAI\ Studio* 2>/dev/null | head -n 1)
-    if [ -n "$CRASH_LOG" ]; then
-        echo "Most recent crash log:"
-        echo "  $CRASH_LOG"
-        echo ""
-        echo "First 50 lines of crash log:"
-        head -n 50 "$CRASH_LOG"
-    fi
-    exit 1
+# Get the actual app process (not just the 'open' command)
+APP_PID=$(pgrep -f "VAI Studio.app/Contents/MacOS" || echo "")
+
+if [ -z "$APP_PID" ]; then
+    fail "App failed to launch"
 fi
+
+pass "App launched (PID: $APP_PID)"
 
 # Monitor for 10 seconds
 echo "Monitoring for 10 seconds..."
 for i in {10..1}; do
     if ! ps -p $APP_PID > /dev/null 2>&1; then
-        echo -e "${RED}✗ App crashed after $((11-i)) seconds${NC}"
-        exit 1
+        echo ""
+        fail "App crashed after $((11-i)) seconds"
     fi
     echo "  $i seconds remaining..."
     sleep 1
 done
 
 # Check final status
+if ! ps -p $APP_PID > /dev/null 2>&1; then
+    echo ""
+    fail "App crashed during monitoring"
+fi
+
+pass "App still running after 10 seconds"
+
+# Kill the app gracefully
+echo ""
+echo "Closing app..."
+killall "VAI Studio" 2>/dev/null || true
+sleep 1
+
+# Force kill if still running
 if ps -p $APP_PID > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ App is still running - smoke test PASSED${NC}"
-
-    # Ask user to close the app
-    echo ""
-    echo "Please interact with the app briefly to verify:"
-    echo "  - Window opens correctly"
-    echo "  - UI renders properly"
-    echo "  - No console errors"
-    echo ""
-    echo "Press ENTER when ready to close the app..."
-    read -r
-
-    # Kill the app
-    echo "Closing app..."
-    killall "VAI Studio" 2>/dev/null || true
-else
-    echo -e "${RED}✗ App crashed during monitoring${NC}"
-    exit 1
+    kill -9 $APP_PID 2>/dev/null || true
 fi
 
 echo ""
 echo "=================================================="
-echo -e "${GREEN}✓ SMOKE TEST PASSED${NC}"
+echo -e "${GREEN}✓✓✓ ALL TESTS PASSED ✓✓✓${NC}"
 echo "=================================================="
 echo ""
-echo "The app launched successfully and ran without crashes."
-echo "You can now proceed with a signed production build:"
+echo "Summary:"
+echo "  Tests passed: $TESTS_PASSED"
+echo "  Tests failed: $TESTS_FAILED"
+echo ""
+echo "The bundle is validated and ready for production build."
+echo "To create a signed production build, run:"
 echo ""
 echo "  pnpm run build:mac"
 echo ""
