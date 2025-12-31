@@ -1684,8 +1684,38 @@ ipcMain.handle('cleanup-temp-file', async (event, filePath) => {
 });
 
 // Open external URL (for Apache License link)
+// Security: Validate URL to prevent open redirect attacks
 ipcMain.handle('open-external', async (event, url) => {
   try {
+    // Only allow HTTPS URLs to trusted domains
+    const allowedDomains = [
+      'apache.org',
+      'github.com',
+      'huggingface.co',
+      'odd.community',
+      'supabase.co',
+      'anthropic.com'
+    ];
+
+    const parsedUrl = new URL(url);
+
+    // Must be HTTPS (not file://, javascript:, etc.)
+    if (parsedUrl.protocol !== 'https:') {
+      logger.warn('[Open External] Blocked non-HTTPS URL:', url);
+      return { success: false, error: 'Only HTTPS URLs are allowed' };
+    }
+
+    // Check if domain is in allowlist
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isAllowed = allowedDomains.some(domain =>
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+
+    if (!isAllowed) {
+      logger.warn('[Open External] Blocked URL to untrusted domain:', url);
+      return { success: false, error: 'URL domain not in allowlist' };
+    }
+
     await shell.openExternal(url);
     return { success: true };
   } catch (error) {
