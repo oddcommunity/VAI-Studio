@@ -1095,6 +1095,18 @@ ipcMain.handle('auth:sign-in-email', async (event, email) => {
   }
 });
 
+// Verify OTP code
+ipcMain.handle('auth:verify-otp', async (event, { email, code }) => {
+  try {
+    logger.info('Verify OTP request', { email, codeLength: code?.length });
+    const result = await authService.verifyOtpCode(email, code);
+    return result;
+  } catch (error) {
+    logger.error('Verify OTP failed', { email, error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
 // Sign out
 ipcMain.handle('auth:sign-out', async () => {
   try {

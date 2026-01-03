@@ -47,6 +47,46 @@ pip install --upgrade pip
 echo "Installing dependencies..."
 pip install -r "$BACKENDS_DIR/requirements.txt"
 
+# ============================================
+# VALIDATION: Verify all requirements installed
+# ============================================
+echo ""
+echo "Validating Python dependencies..."
+
+# Create list of installed packages
+pip freeze > "$BUNDLE_DIR/installed-packages.txt"
+
+# Check each requirement is satisfied
+MISSING_PACKAGES=""
+while IFS= read -r line || [[ -n "$line" ]]; do
+  # Skip empty lines and comments
+  [[ -z "$line" || "$line" =~ ^# ]] && continue
+
+  # Extract package name (before ==, >=, <=, etc.)
+  pkg_name=$(echo "$line" | sed -E 's/([a-zA-Z0-9_-]+).*/\1/' | tr '[:upper:]' '[:lower:]')
+
+  # Normalize: pip freeze uses underscores, requirements often use hyphens
+  # Check both variants
+  pkg_name_underscore=$(echo "$pkg_name" | tr '-' '_')
+  pkg_name_hyphen=$(echo "$pkg_name" | tr '_' '-')
+
+  # Check if package is installed (case-insensitive, handle both naming conventions)
+  if ! grep -iq "^${pkg_name}==" "$BUNDLE_DIR/installed-packages.txt" && \
+     ! grep -iq "^${pkg_name_underscore}==" "$BUNDLE_DIR/installed-packages.txt" && \
+     ! grep -iq "^${pkg_name_hyphen}==" "$BUNDLE_DIR/installed-packages.txt"; then
+    MISSING_PACKAGES="$MISSING_PACKAGES $pkg_name"
+  fi
+done < "$BACKENDS_DIR/requirements.txt"
+
+if [ -n "$MISSING_PACKAGES" ]; then
+  echo "❌ ERROR: Missing Python packages:$MISSING_PACKAGES"
+  echo "The venv is incomplete. Build will fail at runtime."
+  exit 1
+fi
+
+echo "✅ All required Python packages installed successfully"
+echo "   Total packages: $(wc -l < "$BUNDLE_DIR/installed-packages.txt" | tr -d ' ')"
+
 # Clean up unnecessary files to reduce bundle size
 echo "Cleaning up unnecessary files..."
 find "$BUNDLE_DIR/venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

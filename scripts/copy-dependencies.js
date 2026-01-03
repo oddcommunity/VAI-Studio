@@ -51,8 +51,10 @@ const OPTIONAL_MODULES = new Set([
 ]);
 
 // Directories to skip when copying
+// NOTE: 'node_modules' is NOT skipped - pnpm nests deps when versions conflict
+// and we need to copy those nested node_modules (e.g., conf/node_modules/ajv)
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.github', 'test', 'tests', '__tests__',
+  '.git', '.github', 'test', 'tests', '__tests__',
   'docs', 'doc', 'examples', 'example', 'coverage', '.nyc_output',
   'benchmark', 'benchmarks', '.vscode', '.idea'
 ]);
@@ -116,8 +118,11 @@ class DependencyCopier {
 
   /**
    * Recursively copy a module and all its dependencies
+   * @param {string} moduleName - Name of the module to copy
+   * @param {number} depth - Current recursion depth for indentation
+   * @param {string|null} parentPnpmPath - Path to parent's pnpm node_modules for relative resolution
    */
-  async copyModuleRecursive(moduleName, depth = 0) {
+  async copyModuleRecursive(moduleName, depth = 0, parentPnpmPath = null) {
     // Skip if already visited
     if (this.visited.has(moduleName)) {
       return;
@@ -139,7 +144,8 @@ class DependencyCopier {
 
     try {
       // Resolve the module path (handles symlinks)
-      const modulePath = this.resolveModulePath(moduleName);
+      // First try relative to parent (pnpm's proper resolution), then global
+      const modulePath = this.resolveModulePath(moduleName, parentPnpmPath);
 
       if (!modulePath) {
         // Only warn for non-optional modules
@@ -167,6 +173,11 @@ class DependencyCopier {
       this.stats.copiedPackages++;
       this.stats.totalSize += size;
 
+      // Determine the pnpm path for this module's dependencies
+      // pnpm stores packages at: .pnpm/<pkg>@<ver>/node_modules/<pkg>
+      // The parent directory of <pkg> contains symlinks to its dependencies
+      const currentPnpmPath = this.getPnpmNodeModulesPath(modulePath);
+
       // Recursively copy dependencies
       const dependencies = {
         ...packageJson.dependencies,
@@ -178,7 +189,7 @@ class DependencyCopier {
 
         for (const depName of Object.keys(dependencies)) {
           if (!BUILTIN_MODULES.has(depName) && !this.visited.has(depName)) {
-            await this.copyModuleRecursive(depName, depth + 1);
+            await this.copyModuleRecursive(depName, depth + 1, currentPnpmPath);
           }
         }
       }
@@ -190,10 +201,43 @@ class DependencyCopier {
   }
 
   /**
-   * Resolve module path, handling pnpm symlinks
+   * Get the pnpm node_modules path for a resolved module
+   * This is the directory containing symlinks to the module's dependencies
    */
-  resolveModulePath(moduleName) {
-    // Try direct path first (for workspace packages)
+  getPnpmNodeModulesPath(modulePath) {
+    // modulePath is like: .pnpm/conf@14.0.0/node_modules/conf
+    // We want: .pnpm/conf@14.0.0/node_modules (the parent)
+    const parentDir = path.dirname(modulePath);
+
+    // Verify this looks like a pnpm node_modules directory
+    if (parentDir.includes('.pnpm') && parentDir.endsWith('node_modules')) {
+      return parentDir;
+    }
+
+    return null;
+  }
+
+  /**
+   * Resolve module path, handling pnpm symlinks
+   * @param {string} moduleName - Name of the module to resolve
+   * @param {string|null} parentPnpmPath - Path to parent's pnpm node_modules for relative resolution
+   */
+  resolveModulePath(moduleName, parentPnpmPath = null) {
+    // FIRST: Try resolving relative to parent package (pnpm's proper resolution)
+    // This ensures we get the correct version that the parent depends on
+    if (parentPnpmPath) {
+      const relativeModulePath = path.join(parentPnpmPath, moduleName);
+      if (fs.existsSync(relativeModulePath)) {
+        const stats = fs.lstatSync(relativeModulePath);
+        if (stats.isSymbolicLink()) {
+          // Resolve symlink to actual location
+          return fs.realpathSync(relativeModulePath);
+        }
+        return relativeModulePath;
+      }
+    }
+
+    // Try direct path in root node_modules (for workspace packages)
     const directPath = path.join(this.nodeModulesRoot, moduleName);
 
     if (fs.existsSync(directPath)) {
@@ -207,7 +251,7 @@ class DependencyCopier {
       return directPath;
     }
 
-    // Try to find in .pnpm store
+    // Try to find in .pnpm store (fallback)
     // pnpm structure: .pnpm/<package>@<version>/node_modules/<package>
     if (fs.existsSync(this.pnpmRoot)) {
       const pnpmDirs = fs.readdirSync(this.pnpmRoot);
@@ -217,13 +261,13 @@ class DependencyCopier {
         ? moduleName.replace('/', '+')  // @odd-core/auth -> @odd-core+auth
         : moduleName;
 
-      // Find matching package directory
-      const matchingDir = pnpmDirs.find(dir => {
-        // Match package@version pattern
-        return dir.startsWith(searchName + '@') || dir === searchName;
-      });
+      // Find matching package directories and sort by version (descending)
+      // This ensures we get the latest version when multiple versions exist
+      const matchingDirs = pnpmDirs
+        .filter(dir => dir.startsWith(searchName + '@') || dir === searchName)
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
-      if (matchingDir) {
+      for (const matchingDir of matchingDirs) {
         const pnpmModulePath = path.join(
           this.pnpmRoot,
           matchingDir,

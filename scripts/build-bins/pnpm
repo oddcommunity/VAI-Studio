@@ -1,0 +1,37 @@
+#!/bin/bash
+# pnpm wrapper for electron-builder builds
+# Limits depth for `pnpm list` to prevent OOM in large workspaces
+
+# Get the real pnpm path (skip this wrapper in PATH)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REAL_PNPM=$(which -a pnpm | grep -v "$SCRIPT_DIR" | head -1)
+
+if [ -z "$REAL_PNPM" ]; then
+    # Fallback to common locations
+    if [ -x "/Users/exeai/Library/pnpm/pnpm" ]; then
+        REAL_PNPM="/Users/exeai/Library/pnpm/pnpm"
+    elif [ -x "/opt/homebrew/bin/pnpm" ]; then
+        REAL_PNPM="/opt/homebrew/bin/pnpm"
+    elif [ -x "/usr/local/bin/pnpm" ]; then
+        REAL_PNPM="/usr/local/bin/pnpm"
+    fi
+fi
+
+# Check if this is the problematic list command
+if [[ "$1" == "list" && "$*" == *"--depth"* && "$*" == *"Infinity"* ]]; then
+    echo "[pnpm-wrapper] Detected 'pnpm list --depth Infinity' - limiting to depth 3" >&2
+
+    # Replace Infinity with 3
+    ARGS=()
+    for arg in "$@"; do
+        if [ "$arg" == "Infinity" ]; then
+            ARGS+=("3")
+        else
+            ARGS+=("$arg")
+        fi
+    done
+
+    exec "$REAL_PNPM" "${ARGS[@]}"
+else
+    exec "$REAL_PNPM" "$@"
+fi

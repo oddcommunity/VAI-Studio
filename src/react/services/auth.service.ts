@@ -52,11 +52,18 @@ export class AuthService {
   // Supabase Authentication (with PKCE security)
 
   /**
-   * Sign in with email (magic link)
-   * Uses state parameter for CSRF protection
+   * Sign in with email (OTP verification code)
+   * Sends a 6-digit code to the user's email
    */
   async signInWithEmail(email: string) {
     return electronBridge.auth.signInWithEmail(email)
+  }
+
+  /**
+   * Verify OTP code entered by user
+   */
+  async verifyOtp(email: string, code: string) {
+    return electronBridge.auth.verifyOtp(email, code)
   }
 
   /**

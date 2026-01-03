@@ -63,8 +63,10 @@ export interface ElectronAPI {
 
   // Supabase Auth (with PKCE security)
   auth: {
-    // Email magic link auth (uses state for CSRF protection)
-    signInWithEmail(email: string): Promise<{ success: boolean; state?: string; error?: string }>;
+    // Email OTP auth (sends 6-digit verification code)
+    signInWithEmail(email: string): Promise<{ success: boolean; message?: string; error?: string }>;
+    // Verify OTP code
+    verifyOtp(email: string, code: string): Promise<{ success: boolean; session?: AuthSession; user?: unknown; error?: string }>;
     // OAuth sign-in (uses PKCE + state, opens browser)
     signInWithOAuth(provider: string): Promise<{ success: boolean; url?: string; state?: string; error?: string }>;
     // Sign out

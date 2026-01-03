@@ -239,12 +239,24 @@ function checkTransitiveDependencies(nodeModulesPath) {
       }
 
       // Check if transitive dependency exists
-      const depPath = path.join(nodeModulesPath, depName);
+      // First check top-level, then check nested under parent package
+      // (pnpm nests deps when there are version conflicts)
+      let depPath = path.join(nodeModulesPath, depName);
+      let location = 'top-level';
+
+      if (!fs.existsSync(depPath)) {
+        // Check nested under parent package (e.g., conf/node_modules/ajv)
+        const nestedPath = path.join(nodeModulesPath, packageName, 'node_modules', depName);
+        if (fs.existsSync(nestedPath)) {
+          depPath = nestedPath;
+          location = 'nested';
+        }
+      }
 
       if (fs.existsSync(depPath)) {
-        console.log(`    ✓ ${packageName} → ${depName}`);
+        console.log(`    ✓ ${packageName} → ${depName} (${location})`);
       } else {
-        console.log(`    ✗ ${packageName} → ${depName} (MISSING)`);
+        console.log(`    ✗ ${packageName} → ${depName} (MISSING - checked both top-level and nested)`);
         hasErrors = true;
       }
     }
@@ -262,6 +274,138 @@ function checkTransitiveDependencies(nodeModulesPath) {
   return !hasErrors;
 }
 
+/**
+ * Check that workspace packages are actually bundled into main.js
+ * This catches the case where esbuild externalized them instead of bundling
+ */
+function checkWorkspacePackagesBundled() {
+  console.log('\n' + '='.repeat(60));
+  console.log('Checking workspace packages are bundled...\n');
+
+  const bundledMainPath = path.join(__dirname, '../dist-electron/main.js');
+
+  if (!fs.existsSync(bundledMainPath)) {
+    console.log('ERROR: dist-electron/main.js not found');
+    return false;
+  }
+
+  const code = fs.readFileSync(bundledMainPath, 'utf8');
+
+  // These are critical symbols that MUST be in the bundle
+  // They come from @odd-core/* packages
+  const requiredSymbols = [
+    // From @odd-core/auth - authentication functionality
+    { pattern: /supabase|createClient|signIn|signOut/i, name: 'Supabase auth code', critical: true },
+
+    // From @odd-core/storage - storage functionality
+    { pattern: /electron-store|Store/i, name: 'Electron store code', critical: true },
+
+    // From @odd-core/log - logging
+    { pattern: /console\.(log|error|warn|info)/i, name: 'Logging code', critical: false },
+
+    // General electron code
+    { pattern: /BrowserWindow|ipcMain|app\./i, name: 'Electron main process code', critical: true },
+
+    // Auto-updater
+    { pattern: /autoUpdater|electron-updater/i, name: 'Auto-updater code', critical: true },
+  ];
+
+  let hasErrors = false;
+  let criticalMissing = [];
+
+  for (const { pattern, name, critical } of requiredSymbols) {
+    if (pattern.test(code)) {
+      console.log(`  ✓ ${name}`);
+    } else {
+      if (critical) {
+        console.log(`  ✗ ${name} (CRITICAL - MISSING)`);
+        criticalMissing.push(name);
+        hasErrors = true;
+      } else {
+        console.log(`  ? ${name} (not found, may be optional)`);
+      }
+    }
+  }
+
+  // Also verify bundle is substantial
+  const bundleSizeKB = code.length / 1024;
+  const minBundleSizeKB = 500; // Bundle should be at least 500KB
+
+  console.log(`\n  Bundle size: ${bundleSizeKB.toFixed(0)} KB`);
+
+  if (bundleSizeKB < minBundleSizeKB) {
+    console.log(`  ✗ Bundle too small (< ${minBundleSizeKB} KB) - workspace packages may not be bundled`);
+    hasErrors = true;
+  } else {
+    console.log(`  ✓ Bundle size is healthy`);
+  }
+
+  if (hasErrors) {
+    console.log('\n❌ Workspace package bundling check FAILED');
+    if (criticalMissing.length > 0) {
+      console.log(`Missing critical code: ${criticalMissing.join(', ')}`);
+    }
+    console.log('\nPossible causes:');
+    console.log('  1. esbuild.config.js has workspace packages in "external"');
+    console.log('  2. Workspace packages failed to resolve');
+    console.log('  3. Build ran with wrong configuration\n');
+  } else {
+    console.log('\n✓ Workspace packages appear to be bundled correctly\n');
+  }
+
+  return !hasErrors;
+}
+
+/**
+ * Check package.json integrity for all external modules
+ */
+function checkPackageJsonIntegrity(nodeModulesPath) {
+  console.log('='.repeat(60));
+  console.log('Checking package.json integrity...\n');
+
+  if (!fs.existsSync(nodeModulesPath)) {
+    console.log('⚠ node_modules not found, skipping integrity check');
+    return true;
+  }
+
+  const packagesToCheck = ['electron-store', 'electron-updater', 'ffmpeg-static', 'pdfkit'];
+  let hasErrors = false;
+
+  for (const pkg of packagesToCheck) {
+    const pkgPath = path.join(nodeModulesPath, pkg, 'package.json');
+
+    if (!fs.existsSync(pkgPath)) {
+      console.log(`  ⚠ ${pkg}/package.json not found`);
+      continue;
+    }
+
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+
+      // Validate required fields
+      if (!pkgJson.name || !pkgJson.version) {
+        console.log(`  ✗ ${pkg}/package.json missing name or version`);
+        hasErrors = true;
+      } else if (!pkgJson.main && !pkgJson.exports) {
+        console.log(`  ⚠ ${pkg}/package.json missing main entry point`);
+      } else {
+        console.log(`  ✓ ${pkg}@${pkgJson.version}`);
+      }
+    } catch (e) {
+      console.log(`  ✗ ${pkg}/package.json is corrupted: ${e.message}`);
+      hasErrors = true;
+    }
+  }
+
+  if (hasErrors) {
+    console.log('\n❌ Package.json integrity check FAILED\n');
+  } else {
+    console.log('\n✓ All package.json files are valid\n');
+  }
+
+  return !hasErrors;
+}
+
 function main() {
   console.log('='.repeat(60));
   console.log('Dependency Checker for Bundled Electron Main Process');
@@ -273,10 +417,14 @@ function main() {
 
   const nodeModulesPath = path.join(__dirname, '../dist-electron/node_modules');
   const transitiveOk = checkTransitiveDependencies(nodeModulesPath);
+  const workspaceOk = checkWorkspacePackagesBundled();
+  const integrityOk = checkPackageJsonIntegrity(nodeModulesPath);
 
   console.log('\n' + '='.repeat(60));
 
-  if (mainOk && preloadOk && transitiveOk) {
+  const allOk = mainOk && preloadOk && transitiveOk && workspaceOk && integrityOk;
+
+  if (allOk) {
     console.log('✓ All dependencies are accounted for');
     console.log('='.repeat(60));
     process.exit(0);

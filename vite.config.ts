@@ -50,8 +50,17 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'tamagui-core': ['tamagui'],
-          'tamagui-config': ['@tamagui/config', '@tamagui/themes', '@tamagui/shorthands'],
+          // CRITICAL: Bundle ALL Tamagui-related code together to prevent theme context issues
+          // Splitting tamagui into separate chunks can cause "Missing theme" errors
+          // because the context may be created before the theme config is loaded
+          'ui-framework': [
+            'tamagui',
+            '@tamagui/core',
+            '@tamagui/config',
+            '@tamagui/themes',
+            '@tamagui/shorthands',
+            '@tamagui/toast',
+          ],
           'state-management': ['zustand'],
         }
       }
@@ -70,6 +79,18 @@ export default defineConfig(({ mode }) => ({
       '@hooks': path.resolve(__dirname, './src/react/hooks'),
       '@types': path.resolve(__dirname, './src/react/types'),
       '@themes': path.resolve(__dirname, './src/react/themes'),
+      // CRITICAL: Force all React imports to resolve to ONE instance
+      // This prevents "Invalid hook call" and context issues from duplicate React
+      'react': path.resolve(__dirname, './node_modules/react'),
+      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
+      // CRITICAL: Force all Tamagui imports to resolve to ONE instance
+      // This prevents "Missing theme" errors from duplicate Tamagui contexts
+      // Note: Using find/replacement pattern to handle subpath imports like @tamagui/config/v3
+      'tamagui': path.resolve(__dirname, './node_modules/tamagui'),
+      '@tamagui/core': path.resolve(__dirname, './node_modules/@tamagui/core'),
+      '@tamagui/web': path.resolve(__dirname, './node_modules/@tamagui/web'),
+      '@tamagui/toast': path.resolve(__dirname, './node_modules/@tamagui/toast'),
+      '@tamagui/animate-presence': path.resolve(__dirname, './node_modules/@tamagui/animate-presence'),
       // React Native Web aliases for Tamagui
       'react-native': 'react-native-web',
       'react-native/Libraries/Utilities/codegenNativeComponent': path.resolve(__dirname, './src/react/shims/codegenNativeComponent.ts'),

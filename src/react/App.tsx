@@ -272,10 +272,40 @@ export function App() {
     }
   }, [updateSetting, isAuthenticated])
 
-  // Handle login success - proceed to main app
-  const handleLoginComplete = useCallback(() => {
+  // Handle login success - proceed to main app and fetch profile
+  const handleLoginComplete = useCallback(async () => {
     setIsAuthenticated(true)
     setShowLogin(false)
+
+    // Fetch user profile after successful login
+    try {
+      const authResult = await electronBridge.auth.isAuthenticated()
+      if (authResult.success && authResult.isAuthenticated && authResult.userId) {
+        setUserId(authResult.userId)
+        setUserEmail(authResult.email)
+
+        // Fetch full profile
+        const profileResult = await electronBridge.auth.getProfile()
+        if (profileResult.success && profileResult.profile) {
+          setUserEmail(profileResult.profile.email)
+          setUserName(profileResult.profile.displayName || undefined)
+          setUserAvatarUrl(profileResult.profile.avatarUrl || undefined)
+          setUserPhone(profileResult.profile.phone || undefined)
+
+          // Cache profile
+          webProfileCache.set({
+            userId: authResult.userId,
+            email: profileResult.profile.email,
+            displayName: profileResult.profile.displayName || null,
+            avatarUrl: profileResult.profile.avatarUrl || null,
+            initials: getInitials(profileResult.profile.email, profileResult.profile.displayName),
+            cachedAt: Date.now(),
+          })
+        }
+      }
+    } catch (error) {
+      console.warn('[App] Failed to fetch profile after login:', error)
+    }
   }, [])
 
   // Handle going back to onboarding from login
@@ -364,121 +394,90 @@ export function App() {
     }
   }, [showToast, userId, updateSetting])
 
-  // While checking auth status, show nothing (very brief)
-  if (checkingAuth) {
-    return (
-      <OddProvider defaultTheme="vai_dark">
-        <YStack flex={1} height="100%" backgroundColor="$background" />
-      </OddProvider>
-    )
-  }
+  // Determine which screen to show
+  const showOnboarding = !hasCompletedOnboarding
+  const showLoginScreen = (showLogin && !isAuthenticated) || (hasCompletedOnboarding && !isAuthenticated)
+  const showMainApp = hasCompletedOnboarding && isAuthenticated
 
-  // Show onboarding for first-time users
-  if (!hasCompletedOnboarding) {
-    return (
-      <OddProvider defaultTheme="vai_dark">
-        <ErrorBoundary>
-          <YStack flex={1} height="100%" position="relative">
-            {/* Draggable Header for Electron */}
-            <DraggableHeader />
-            <OnboardingScreen onComplete={handleOnboardingComplete} />
-          </YStack>
-        </ErrorBoundary>
-      </OddProvider>
-    )
-  }
-
-  // Show login screen after onboarding (if not already authenticated)
-  if (showLogin && !isAuthenticated) {
-    return (
-      <OddProvider defaultTheme="vai_dark">
-        <ErrorBoundary>
-          <YStack flex={1} height="100%" position="relative">
-            {/* Draggable Header for Electron */}
-            <DraggableHeader />
-            <LoginScreen
-              onLoginSuccess={handleLoginComplete}
-              onBack={handleBackToOnboarding}
-            />
-            {/* Toast Viewport */}
-            <AppToastViewport />
-          </YStack>
-        </ErrorBoundary>
-      </OddProvider>
-    )
-  }
-
-  // If completed onboarding but not authenticated, show login
-  if (hasCompletedOnboarding && !isAuthenticated) {
-    return (
-      <OddProvider defaultTheme="vai_dark">
-        <ErrorBoundary>
-          <YStack flex={1} height="100%" position="relative">
-            {/* Draggable Header for Electron */}
-            <DraggableHeader />
-            <LoginScreen
-              onLoginSuccess={handleLoginComplete}
-              onBack={handleBackToOnboarding}
-            />
-            {/* Toast Viewport */}
-            <AppToastViewport />
-          </YStack>
-        </ErrorBoundary>
-      </OddProvider>
-    )
-  }
-
+  // Single OddProvider wraps everything to prevent theme context loss during re-renders
+  // ErrorBoundary wraps OddProvider to catch errors during theme initialization
   return (
-    <OddProvider defaultTheme="vai_dark">
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <OddProvider defaultTheme="vai_dark">
         <YStack flex={1} height="100%" position="relative">
-          {/* Draggable Header for Electron */}
+          {/* Draggable Header for Electron - always shown */}
           <DraggableHeader />
 
-          {/* Update Banner */}
-          <UpdateBanner />
+          {/* Loading state while checking auth */}
+          {checkingAuth && (
+            <YStack flex={1} backgroundColor="$background" />
+          )}
 
-          {/* Main Screen */}
-          <VAIStudioFeatureScreen
-            onAdvancedSettings={handleOpenSettings}
-            onManageModels={handleOpenModelManager}
-            userEmail={userEmail}
-            userName={userName}
-            userAvatarUrl={userAvatarUrl}
-            userPhone={userPhone}
-            isAuthenticated={isAuthenticated ?? false}
-            onSignOut={handleSignOut}
-            onSignIn={handleOpenAuth}
-            onProfileUpdated={handleProfileUpdated}
-          />
+          {/* Onboarding for first-time users */}
+          {!checkingAuth && showOnboarding && (
+            <OnboardingScreen onComplete={handleOnboardingComplete} />
+          )}
 
-          {/* Toast Viewport - OddProvider includes ToastProvider */}
-          <AppToastViewport />
+          {/* Login screen after onboarding (if not authenticated) */}
+          {!checkingAuth && !showOnboarding && showLoginScreen && (
+            <>
+              <LoginScreen
+                onLoginSuccess={handleLoginComplete}
+                onBack={handleBackToOnboarding}
+              />
+              <AppToastViewport />
+            </>
+          )}
 
-          {/* Loading Overlay */}
-          <LoadingOverlay
-            visible={showLoadingScreen || isTranscribing}
-            progress={progress}
-            message={progressMessage}
-            stage={progressStage}
-          />
+          {/* Main authenticated app */}
+          {!checkingAuth && showMainApp && (
+            <>
+              {/* Update Banner */}
+              <UpdateBanner />
 
-          {/* Recording Overlay */}
-          <RecordingOverlayConnected />
+              {/* Main Screen */}
+              <VAIStudioFeatureScreen
+                onAdvancedSettings={handleOpenSettings}
+                onManageModels={handleOpenModelManager}
+                userEmail={userEmail}
+                userName={userName}
+                userAvatarUrl={userAvatarUrl}
+                userPhone={userPhone}
+                isAuthenticated={isAuthenticated ?? false}
+                onSignOut={handleSignOut}
+                onSignIn={handleOpenAuth}
+                onProfileUpdated={handleProfileUpdated}
+              />
 
-          {/* Modals - Lazy loaded */}
-          <Suspense fallback={null}>
-            {settingsOpen && <SettingsModal open={settingsOpen} onClose={handleCloseSettings} />}
-          </Suspense>
-          <Suspense fallback={null}>
-            {modelManagerOpen && <ModelManagerModal open={modelManagerOpen} onClose={handleCloseModelManager} />}
-          </Suspense>
-          <Suspense fallback={null}>
-            {authOpen && <AuthModal open={authOpen} onClose={handleCloseAuth} />}
-          </Suspense>
+              {/* Toast Viewport - OddProvider includes ToastProvider */}
+              <AppToastViewport />
+
+              {/* Loading Overlay */}
+              <LoadingOverlay
+                visible={showLoadingScreen || isTranscribing}
+                progress={progress}
+                message={progressMessage}
+                stage={progressStage}
+              />
+
+              {/* Recording Overlay */}
+              <RecordingOverlayConnected />
+
+              {/* Modals - Lazy loaded */}
+              <Suspense fallback={null}>
+                {settingsOpen && <SettingsModal open={settingsOpen} onClose={handleCloseSettings} />}
+              </Suspense>
+              <Suspense fallback={null}>
+                {modelManagerOpen && <ModelManagerModal open={modelManagerOpen} onClose={handleCloseModelManager} />}
+              </Suspense>
+              <Suspense fallback={null}>
+                {authOpen && <AuthModal open={authOpen} onClose={handleCloseAuth} />}
+              </Suspense>
+            </>
+          )}
         </YStack>
-      </ErrorBoundary>
-    </OddProvider>
+      </OddProvider>
+    </ErrorBoundary>
   )
 }
 

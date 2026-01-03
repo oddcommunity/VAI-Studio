@@ -4,10 +4,10 @@ import {
   XStack,
   Text,
   Input,
-  useTheme,
   ScrollView,
 } from '@odd-design-system/ui-components'
 import { ChevronDown, ChevronRight, Search, Check, Circle, Download } from '@tamagui/lucide-icons'
+import { useSafeTheme } from '../../providers/OddProvider'
 
 export interface ModelItem {
   id: string
@@ -70,7 +70,7 @@ export function GroupedModelSelector({
   selectedModels = [],
   onModelsChange,
 }: GroupedModelSelectorProps) {
-  const theme = useTheme()
+  const theme = useSafeTheme()
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 

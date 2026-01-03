@@ -185,8 +185,8 @@ class AuthService {
   }
 
   /**
-   * Sign in with email (OTP) using secure state parameter
-   * Uses PKCE state for CSRF protection on callback
+   * Sign in with email using OTP verification code
+   * Sends a 6-digit code to the user's email for verification
    */
   async signInWithEmail(email) {
     if (!this.initialized) {
@@ -194,37 +194,98 @@ class AuthService {
     }
 
     try {
-      console.log('[AuthService] === SIGN IN WITH EMAIL ===');
+      console.log('[AuthService] === SIGN IN WITH EMAIL (OTP) ===');
       console.log('[AuthService] Email:', email);
-      console.log('[AuthService] Redirect URL:', EMAIL_REDIRECT_URL);
 
-      logger.info('Sending secure OTP to email', { email, redirectTo: EMAIL_REDIRECT_URL });
+      logger.info('Sending OTP code to email', { email });
 
-      // Use signInWithEmailSecure from AuthManager
-      // Note: useState=false for email because appending ?state= to the redirect URL
-      // can cause Supabase allowlist matching issues with custom schemes
-      const result = await this.authManager.signInWithEmailSecure(email, {
-        redirectUrl: EMAIL_REDIRECT_URL,
-        useState: false  // Don't append state to URL - causes allowlist mismatch
+      // Use Supabase's signInWithOtp - sends a 6-digit code instead of magic link
+      // No redirect URL needed since user enters the code in-app
+      const { data, error } = await this.supabaseClient.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true, // Create user if doesn't exist
+        }
       });
 
-      console.log('[AuthService] signInWithEmailSecure completed successfully');
+      if (error) {
+        throw new Error(error.message);
+      }
 
-      // Store the state for callback validation
-      this.pendingAuthState = result.state;
+      console.log('[AuthService] OTP code sent successfully');
 
-      logger.info('OTP sent successfully with state protection', {
+      logger.info('OTP code sent successfully', { email });
+
+      return {
+        success: true,
+        message: 'Check your email for the verification code'
+      };
+    } catch (error) {
+      logger.error('Failed to send OTP code', {
         email,
-        stateLength: result.state?.length
+        error: error.message
+      });
+
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Verify OTP code entered by user
+   * @param {string} email - The email address used to sign in
+   * @param {string} code - The 6-digit verification code
+   */
+  async verifyOtpCode(email, code) {
+    if (!this.initialized) {
+      throw new Error('Auth service not initialized');
+    }
+
+    try {
+      console.log('[AuthService] === VERIFY OTP CODE ===');
+      console.log('[AuthService] Email:', email);
+      console.log('[AuthService] Code length:', code?.length);
+
+      logger.info('Verifying OTP code', { email, codeLength: code?.length });
+
+      // Verify the OTP code
+      console.log('[AuthService] Calling verifyOtp with:', { email, token: code, type: 'email' });
+      const { data, error } = await this.supabaseClient.auth.verifyOtp({
+        email,
+        token: code,
+        type: 'email' // OTP type for email verification
+      });
+
+      console.log('[AuthService] verifyOtp response:', { data, error });
+
+      if (error) {
+        console.error('[AuthService] verifyOtp error details:', error);
+        throw new Error(error.message);
+      }
+
+      if (!data.session) {
+        throw new Error('No session returned after OTP verification');
+      }
+
+      // Store the session
+      this.currentSession = data.session;
+
+      console.log('[AuthService] OTP verification successful');
+
+      logger.info('OTP verification successful', {
+        email,
+        userId: data.user?.id
       });
 
       return {
         success: true,
-        message: 'Check your email for the login link',
-        state: result.state // Return state so it can be stored if needed
+        session: data.session,
+        user: data.user
       };
     } catch (error) {
-      logger.error('Failed to send OTP', {
+      logger.error('OTP verification failed', {
         email,
         error: error.message
       });

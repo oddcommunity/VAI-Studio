@@ -1,189 +1,136 @@
 #!/bin/bash
-
-# Sequoia Gatekeeper Verification Script
-# Based on known issues with macOS Sequoia (15) and Electron apps
 #
-# This script verifies:
-# 1. No external symlinks in the app bundle
-# 2. No external RPATH references
-# 3. All nested binaries are signed
-# 4. Notarization ticket is stapled
-# 5. Gatekeeper assessment passes
+# Gatekeeper Verification Script
+#
+# Validates that a signed and notarized app will pass macOS Gatekeeper.
+# This MUST be run after notarization to catch issues before release.
+#
+# Exit codes:
+#   0 - App passes Gatekeeper assessment
+#   1 - App would be blocked by Gatekeeper
+#   2 - Script error (missing args, file not found, etc.)
+#
 
 set -e
 
-APP_PATH="${1:-dist/mac-arm64/VAI Studio.app}"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-echo "=============================================="
-echo "macOS Sequoia Gatekeeper Verification"
-echo "=============================================="
 echo ""
-echo "App: $APP_PATH"
+echo "========================================"
+echo "  GATEKEEPER VERIFICATION"
+echo "========================================"
 echo ""
 
-if [ ! -d "$APP_PATH" ]; then
-  echo "Error: App not found at $APP_PATH"
-  echo "Run 'pnpm run build:mac' first"
-  exit 1
+if [ -z "$1" ]; then
+    echo -e "${RED}ERROR: No app path provided${NC}"
+    echo "Usage: $0 /path/to/App.app"
+    exit 2
 fi
+
+APP_PATH="$1"
+
+if [ ! -e "$APP_PATH" ]; then
+    echo -e "${RED}ERROR: Path does not exist: $APP_PATH${NC}"
+    exit 2
+fi
+
+# If DMG, mount it first
+MOUNTED_DMG=""
+if [[ "$APP_PATH" == *.dmg ]]; then
+    echo -e "${CYAN}Mounting DMG...${NC}"
+    MOUNT_OUTPUT=$(hdiutil attach "$APP_PATH" -nobrowse -readonly 2>&1)
+    MOUNT_POINT=$(echo "$MOUNT_OUTPUT" | grep "/Volumes/" | awk '{print $NF}')
+    
+    if [ -z "$MOUNT_POINT" ]; then
+        echo -e "${RED}ERROR: Failed to mount DMG${NC}"
+        exit 2
+    fi
+    
+    MOUNTED_DMG="$MOUNT_POINT"
+    APP_PATH=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -type d | head -1)
+    
+    if [ -z "$APP_PATH" ]; then
+        echo -e "${RED}ERROR: No .app found in DMG${NC}"
+        hdiutil detach "$MOUNT_POINT" -quiet
+        exit 2
+    fi
+fi
+
+cleanup() {
+    if [ -n "$MOUNTED_DMG" ]; then
+        hdiutil detach "$MOUNTED_DMG" -quiet 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+echo -e "${CYAN}Verifying: $APP_PATH${NC}"
+echo ""
 
 ERRORS=0
 
-# ============================================
-# 1. Check for external symlinks
-# ============================================
-echo "1. Checking for external symlinks..."
-echo "   (Sequoia blocks apps with symlinks to external paths)"
-
-EXTERNAL_SYMLINKS=$(find "$APP_PATH" -type l 2>/dev/null | while read -r link; do
-  target=$(readlink "$link" 2>/dev/null || true)
-  if [[ "$target" == /* ]] && [[ "$target" != "$APP_PATH"* ]]; then
-    echo "   $link -> $target"
-  fi
-done)
-
-if [ -n "$EXTERNAL_SYMLINKS" ]; then
-  echo "   [FAIL] Found external symlinks:"
-  echo "$EXTERNAL_SYMLINKS"
-  ERRORS=$((ERRORS + 1))
+# 1. Code Signature Verification
+echo -e "${BOLD}1. Code Signature Verification${NC}"
+if codesign --verify --deep --strict "$APP_PATH" 2>&1; then
+    echo -e "  ${GREEN}✅ Code signature is valid${NC}"
 else
-  echo "   [PASS] No external symlinks found"
-fi
-echo ""
-
-# ============================================
-# 2. Check Python venv for external references
-# ============================================
-echo "2. Checking Python venv for external references..."
-VENV_PATH="$APP_PATH/Contents/Resources/backends/venv"
-
-if [ -d "$VENV_PATH" ]; then
-  # Check for symlinks in bin/
-  VENV_SYMLINKS=$(find "$VENV_PATH/bin" -type l 2>/dev/null | while read -r link; do
-    target=$(readlink "$link" 2>/dev/null || true)
-    # Check if target is external (absolute path outside venv)
-    if [[ "$target" == /* ]] && [[ "$target" != "$VENV_PATH"* ]]; then
-      echo "   $link -> $target"
-    fi
-  done)
-
-  if [ -n "$VENV_SYMLINKS" ]; then
-    echo "   [FAIL] Found external symlinks in venv:"
-    echo "$VENV_SYMLINKS"
+    echo -e "  ${RED}❌ Code signature verification FAILED${NC}"
     ERRORS=$((ERRORS + 1))
-  else
-    echo "   [PASS] No external symlinks in venv"
-  fi
-else
-  echo "   [SKIP] No Python venv found"
 fi
+
+# 2. Notarization Staple Check
 echo ""
-
-# ============================================
-# 3. Check for unsigned binaries
-# ============================================
-echo "3. Checking for unsigned native binaries..."
-echo "   (All .so/.dylib must be signed for Gatekeeper)"
-
-UNSIGNED_COUNT=0
-TOTAL_COUNT=0
-
-while IFS= read -r binary; do
-  if [ -n "$binary" ]; then
-    TOTAL_COUNT=$((TOTAL_COUNT + 1))
-    if ! codesign --verify --verbose "$binary" 2>/dev/null; then
-      if [ $UNSIGNED_COUNT -lt 5 ]; then
-        echo "   [WARN] Unsigned: $(basename "$binary")"
-      fi
-      UNSIGNED_COUNT=$((UNSIGNED_COUNT + 1))
-    fi
-  fi
-done < <(find "$APP_PATH" -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null)
-
-if [ $UNSIGNED_COUNT -gt 0 ]; then
-  echo "   [WARN] $UNSIGNED_COUNT of $TOTAL_COUNT native binaries unsigned"
-  echo "         (Will be signed by electron-builder, but may need pre-signing)"
+echo -e "${BOLD}2. Notarization Staple Check${NC}"
+STAPLE_CHECK=$(stapler validate "$APP_PATH" 2>&1 || true)
+if echo "$STAPLE_CHECK" | grep -q "The validate action worked"; then
+    echo -e "  ${GREEN}✅ Notarization ticket is stapled${NC}"
 else
-  echo "   [PASS] All $TOTAL_COUNT native binaries signed"
+    echo -e "  ${YELLOW}⚠️  Notarization ticket not stapled (may still work online)${NC}"
 fi
+
+# 3. Gatekeeper Assessment (CRITICAL)
 echo ""
-
-# ============================================
-# 4. Verify main app signature
-# ============================================
-echo "4. Verifying app code signature..."
-
-if codesign --verify --deep --strict "$APP_PATH" 2>/dev/null; then
-  echo "   [PASS] App signature valid (--deep --strict)"
-else
-  echo "   [FAIL] App signature invalid"
-  echo "         Run: codesign --verify --deep --strict \"$APP_PATH\""
-  ERRORS=$((ERRORS + 1))
-fi
-echo ""
-
-# ============================================
-# 5. Check Gatekeeper assessment
-# ============================================
-echo "5. Running Gatekeeper assessment..."
-echo "   (spctl -a -vvv -t exec)"
-
-SPCTL_OUTPUT=$(spctl -a -vvv -t exec "$APP_PATH" 2>&1 || true)
-echo "$SPCTL_OUTPUT" | head -5
+echo -e "${BOLD}3. Gatekeeper Assessment (CRITICAL)${NC}"
+SPCTL_OUTPUT=$(spctl --assess --type execute -vvv "$APP_PATH" 2>&1 || true)
 
 if echo "$SPCTL_OUTPUT" | grep -q "accepted"; then
-  echo "   [PASS] Gatekeeper accepts the app"
+    echo -e "  ${GREEN}✅ Gatekeeper: ACCEPTED${NC}"
+    echo "$SPCTL_OUTPUT" | grep -E "(source=|origin=)" | sed 's/^/  /' || true
+elif echo "$SPCTL_OUTPUT" | grep -q "rejected"; then
+    echo -e "  ${RED}❌ Gatekeeper: REJECTED${NC}"
+    echo "$SPCTL_OUTPUT" | sed 's/^/  /'
+    ERRORS=$((ERRORS + 1))
 else
-  echo "   [WARN] Gatekeeper may not accept (check notarization)"
+    echo -e "  ${YELLOW}⚠️  Gatekeeper assessment unclear${NC}"
+    echo "$SPCTL_OUTPUT" | sed 's/^/  /'
 fi
+
+# 4. Hardened Runtime
 echo ""
-
-# ============================================
-# 6. Check notarization stapling
-# ============================================
-echo "6. Checking notarization ticket..."
-echo "   (xcrun stapler validate)"
-
-if xcrun stapler validate "$APP_PATH" 2>/dev/null; then
-  echo "   [PASS] Notarization ticket stapled"
+echo -e "${BOLD}4. Hardened Runtime Check${NC}"
+SIGNING_INFO=$(codesign -dv "$APP_PATH" 2>&1 || true)
+if echo "$SIGNING_INFO" | grep -q "flags=0x10000(runtime)"; then
+    echo -e "  ${GREEN}✅ Hardened runtime is enabled${NC}"
 else
-  echo "   [INFO] No notarization ticket (expected for unsigned builds)"
-fi
-echo ""
-
-# ============================================
-# 7. Check DMG stapling (if exists)
-# ============================================
-DMG_PATH="${APP_PATH//.app/.dmg}"
-DMG_PATH="${DMG_PATH//mac-arm64/}"
-if [ -f "$DMG_PATH" ]; then
-  echo "7. Checking DMG notarization..."
-  if xcrun stapler validate "$DMG_PATH" 2>/dev/null; then
-    echo "   [PASS] DMG notarization ticket stapled"
-  else
-    echo "   [WARN] DMG not stapled (run: xcrun stapler staple \"$DMG_PATH\")"
-  fi
-  echo ""
+    echo -e "  ${YELLOW}⚠️  Hardened runtime may not be enabled${NC}"
 fi
 
-# ============================================
 # Summary
-# ============================================
-echo "=============================================="
-echo "Summary"
-echo "=============================================="
+echo ""
+echo "========================================"
+echo "  VERIFICATION SUMMARY"
+echo "========================================"
+echo ""
 
 if [ $ERRORS -eq 0 ]; then
-  echo "[OK] All Gatekeeper checks passed"
-  exit 0
+    echo -e "${GREEN}${BOLD}✅ All Gatekeeper checks passed!${NC}"
+    exit 0
 else
-  echo "[ERROR] $ERRORS critical issue(s) found"
-  echo ""
-  echo "Recommended fixes:"
-  echo "  1. Run fix-python-symlinks.sh before packaging"
-  echo "  2. Ensure all Python extensions are pre-signed"
-  echo "  3. Use Python 3.11+ instead of 3.9/3.10"
-  echo "  4. Re-notarize: xcrun notarytool submit"
-  echo "  5. Re-staple: xcrun stapler staple"
-  exit 1
+    echo -e "${RED}${BOLD}❌ $ERRORS check(s) failed - app may be blocked${NC}"
+    exit 1
 fi

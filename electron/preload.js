@@ -54,8 +54,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // User Authentication (Supabase with PKCE security)
   auth: {
-    // Email magic link (uses state for CSRF protection)
+    // Email OTP (sends verification code)
     signInWithEmail: (email) => ipcRenderer.invoke('auth:sign-in-email', email),
+    // Verify OTP code
+    verifyOtp: (email, code) => ipcRenderer.invoke('auth:verify-otp', { email, code }),
     // OAuth sign-in (uses PKCE + state, opens browser)
     signInWithOAuth: (provider) => ipcRenderer.invoke('auth:sign-in-oauth', provider),
     // Sign out

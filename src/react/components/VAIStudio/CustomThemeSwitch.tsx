@@ -1,7 +1,7 @@
 import { MoonStar, Sun } from '@tamagui/lucide-icons'
 import { useEffect, useState } from 'react'
-import { AnimatePresence, Switch, View, XStack, YStack, useTheme } from '@odd-design-system/ui-components'
-import { useSchemeSetting } from '@vxrn/color-scheme'
+import { AnimatePresence, Switch, View, XStack, YStack } from '@odd-design-system/ui-components'
+import { useThemeControl } from '../../providers/OddProvider'
 
 // Cloud/lines decoration for the track
 function CloudLines() {
@@ -27,13 +27,13 @@ function Stars() {
 }
 
 export function CustomThemeSwitch() {
-    const [checked, setChecked] = useState(false)
-    const [{ scheme }, setSchemeSetting] = useSchemeSetting()
-    const theme = useTheme()
+    const { currentTheme, setTheme } = useThemeControl()
+    const isDark = currentTheme === 'vai_dark'
+    const [checked, setChecked] = useState(isDark)
 
     useEffect(() => {
-        setChecked(scheme === 'dark')
-    }, [scheme])
+        setChecked(isDark)
+    }, [isDark])
 
     const iconSize = 14
 
@@ -42,7 +42,7 @@ export function CustomThemeSwitch() {
             <Switch
                 checked={checked}
                 onCheckedChange={(checked) => {
-                    setSchemeSetting(checked ? 'dark' : 'light')
+                    setTheme(checked ? 'vai_dark' : 'vai')
                 }}
                 size="$3"
                 backgroundColor="$color3"

@@ -105,10 +105,48 @@ upload_file() {
   fi
 }
 
+# Function to validate YAML manifest structure
+validate_manifest() {
+  local content="$1"
+  local manifest_name="$2"
+
+  # Check required fields exist
+  if ! echo "$content" | grep -q "^version:"; then
+    echo -e "${RED}❌ Manifest $manifest_name missing 'version' field${NC}"
+    return 1
+  fi
+
+  if ! echo "$content" | grep -q "^sha512:"; then
+    echo -e "${RED}❌ Manifest $manifest_name missing 'sha512' field${NC}"
+    return 1
+  fi
+
+  if ! echo "$content" | grep -q "^path:"; then
+    echo -e "${RED}❌ Manifest $manifest_name missing 'path' field${NC}"
+    return 1
+  fi
+
+  # Validate SHA512 is 128 hex characters
+  local sha512=$(echo "$content" | grep "^sha512:" | awk '{print $2}')
+  if [ ${#sha512} -ne 128 ]; then
+    echo -e "${RED}❌ Manifest $manifest_name has invalid SHA512 (expected 128 chars, got ${#sha512})${NC}"
+    return 1
+  fi
+
+  echo -e "${GREEN}✓ Manifest $manifest_name validated${NC}"
+  return 0
+}
+
 # Function to update manifest on VPS
 update_manifest() {
   local manifest_file="$1"
   local content="$2"
+
+  # Validate manifest before uploading
+  if ! validate_manifest "$content" "$manifest_file"; then
+    echo -e "${RED}Manifest validation failed - aborting${NC}"
+    return 1
+  fi
 
   if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}[DRY RUN] Would update: $manifest_file${NC}"
@@ -149,6 +187,24 @@ echo ""
 echo -e "${BLUE}Processing release artifacts...${NC}"
 echo ""
 
+# === ARTIFACT VALIDATION ===
+# Validate artifacts meet minimum quality standards
+echo -e "${BLUE}Running artifact validation...${NC}"
+if [ -f "./scripts/verify-artifacts.js" ]; then
+  if node ./scripts/verify-artifacts.js; then
+    echo -e "${GREEN}✓ Artifact validation passed${NC}"
+  else
+    echo -e "${RED}✗ Artifact validation FAILED${NC}"
+    if [ "$DRY_RUN" = false ]; then
+      echo -e "${YELLOW}Aborting release upload. Fix artifact issues first.${NC}"
+      exit 1
+    fi
+  fi
+else
+  echo -e "${YELLOW}⚠ Artifact validation script not found - skipping${NC}"
+fi
+echo ""
+
 # Process macOS
 if [[ "$PLATFORM" == "mac" || "$PLATFORM" == "all" ]]; then
   echo -e "${BLUE}=== macOS (arm64) ===${NC}"
@@ -158,6 +214,24 @@ if [[ "$PLATFORM" == "mac" || "$PLATFORM" == "all" ]]; then
   ZIP_FILE=$(find dist -name "*-arm64.zip" -type f 2>/dev/null | head -1)
 
   if [ -n "$DMG_FILE" ]; then
+    # === GATEKEEPER VERIFICATION (CRITICAL) ===
+    # This runs spctl --assess to ensure the signed/notarized app will pass Gatekeeper
+    echo -e "${BLUE}Running Gatekeeper verification...${NC}"
+    if [ -f "./scripts/verify-gatekeeper.sh" ]; then
+      if ./scripts/verify-gatekeeper.sh "$DMG_FILE"; then
+        echo -e "${GREEN}✓ Gatekeeper verification passed${NC}"
+      else
+        echo -e "${RED}✗ Gatekeeper verification FAILED${NC}"
+        echo -e "${RED}The app may be blocked on user machines.${NC}"
+        if [ "$DRY_RUN" = false ]; then
+          echo -e "${YELLOW}Aborting release upload. Fix signing/notarization first.${NC}"
+          exit 1
+        fi
+      fi
+    else
+      echo -e "${YELLOW}⚠ Gatekeeper verification script not found - skipping${NC}"
+    fi
+    echo ""
     DMG_NAME=$(basename "$DMG_FILE")
     DMG_SHA512=$(calc_sha512 "$DMG_FILE")
     DMG_SIZE=$(get_file_size "$DMG_FILE")
